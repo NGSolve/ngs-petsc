@@ -1,6 +1,5 @@
 // include order is important here! 
 #include <comp.hpp>
-// #include "petsc_interface.hpp"
 #include "petsc.h"
 #include <python_ngstd.hpp> 
 
@@ -269,9 +268,9 @@ namespace petsc_if
     auto mat = dynamic_pointer_cast<ParallelMatrix>(blf->GetMatrixPtr());
     auto pardofs = mat->GetParallelDofs();
 
-    cout << "KSP for fes, dim = " << BS << endl;
-    cout << "ndof " << pardofs->GetNDofLocal() << "  " << pardofs->GetNDofGlobal() << endl;
-    cout << "fds: " << fds; if(fds) cout << " set: " << fds->NumSet(); cout << endl;
+    // cout << "KSP for fes, dim = " << BS << endl;
+    // cout << "ndof " << pardofs->GetNDofLocal() << "  " << pardofs->GetNDofGlobal() << endl;
+    // cout << "fds: " << fds; if(fds) cout << " set: " << fds->NumSet(); cout << endl;
     
     ::Mat petsc_mat_loc = PETSC_SEQMat(BS, mat->GetMatrix(), fds);
     ::Mat petsc_mat = PETSC_ISMat(BS, pardofs, fds);
@@ -330,7 +329,7 @@ namespace petsc_if
     PCGAMGSetType(petsc_prec, PCGAMGAGG);
     {
       RegionTimer rt(t_sup);
-      if(MyMPI_GetId(pardofs->GetCommunicator())==0) cout << "KSP setup " << endl;
+      // if(MyMPI_GetId(pardofs->GetCommunicator())==0) cout << "KSP setup " << endl;
       KSPSetUp(ksp);
     }
     // rel, abs, div_tol, max_its
@@ -340,7 +339,7 @@ namespace petsc_if
     KSPSetResidualHistory(ksp, &resis[0], 1e4, PETSC_TRUE);
     {
       RegionTimer rt(t_sol);
-      if(MyMPI_GetId(pardofs->GetCommunicator())==0) cout << "KSP solve " << endl;
+      // if(MyMPI_GetId(pardofs->GetCommunicator())==0) cout << "KSP solve " << endl;
       KSPSolve(ksp, petsc_rhs, petsc_sol);
     }
     int nits;
@@ -351,21 +350,21 @@ namespace petsc_if
     KSPGetConvergedReason(ksp, &conv_r);
     
     if(MyMPI_GetId(pardofs->GetCommunicator())==0) {
-      cout << "-------" << endl;
-      cout << "KSP results: " << endl;
-      cout << "KSP errors: " << endl;
-      int maxito = min2(nits, 50);
-      for(auto k:Range(maxito)) cout << k << " = " << resis[k] << endl; 
-      if(maxito<nits) {
-  	cout << "...." << endl;
-  	cout << nits-1 << " = " << resis[nits-1] << endl; 
-      }
-      cout << "-------" << endl;
-      cout << "KSP converged reason: " << name_reason(conv_r) << endl;
-      cout << "KSP needed its: " << nits << endl;
-      cout << "KSP err norm: " << nres << endl;
-      cout << "KSP err norm (rel): " << nres/resis[0] << endl;
-      cout << "-------" << endl;
+      // cout << "-------" << endl;
+      // cout << "KSP results: " << endl;
+      // cout << "KSP errors: " << endl;
+      // int maxito = min2(nits, 50);
+      // for(auto k:Range(maxito)) cout << k << " = " << resis[k] << endl; 
+      // if(maxito<nits) {
+      // 	cout << "...." << endl;
+      // 	cout << nits-1 << " = " << resis[nits-1] << endl; 
+      // }
+      // cout << "-------" << endl;
+      cout << "--- KSP converged reason: " << name_reason(conv_r) << endl;
+      cout << "--- KSP needed its: " << nits << endl;
+      cout << "--- KSP err norm: " << nres << endl;
+      cout << "--- KSP err norm (rel): " << nres/resis[0] << endl;
+      // cout << "-------" << endl;
     }
 
     col_map.P2N(sol, petsc_sol);
