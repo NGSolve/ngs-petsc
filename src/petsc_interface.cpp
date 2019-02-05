@@ -7,8 +7,6 @@
 namespace petsc_if
 {
   using namespace ngcomp;
-  
-  // void foo() { cout << "hi!!" << endl; }
 
   INLINE string name_reason (KSPConvergedReason r) {
     switch(r)
