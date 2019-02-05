@@ -39,7 +39,7 @@ def ParMesh(mesh_func):
     if comm.rank==0:
         ngmesh = mesh_func()
     comm.Barrier()
-    ngmesh.Distribute()
+    ngmesh.Distribute(comm)
     return Mesh(ngmesh)
     
 # geom 1: BEAM
@@ -54,7 +54,15 @@ def mesh_beam(maxh):
 # geom 2: STRIP
 # a very long strip (difficult for AMG!)
 def mesh_strip(Lf):
-    return MakeStructured2DMesh(quads=False, nx=Lf, ny=1, mapping=lambda x,y : (Lf*x,y))
+    #workaround: set NGS-comm to local comm
+    comm = MPI_Init()
+    sc = comm.SubComm([0])
+    from ngsolve.ngstd import SetNGSComm
+    SetNGSComm(sc)
+    ngs_mesh = MakeStructured2DMesh(quads=False, nx=Lf, ny=1, mapping=lambda x,y : (Lf*x,y))
+    mesh = ngs_mesh.ngmesh
+    SetNGSComm(comm)
+    return mesh
 
 # geom 3: FIBERS
 # a 10x1 beam, fixed at the left side
@@ -124,7 +132,7 @@ def mesh_fiber(n_fibers):
 def setup_rots(mesh, comp=True):
     if comp:
         fes1 = VectorH1(mesh, order=1, dirichlet="left")
-        fes2 = H1(mesh, order=1, dirichlet="")
+        fes2 = H1(mesh, order=1, dirichlet="left")
         fes = FESpace( [fes1,fes2] )
         (u,w),(ut,wt)  = fes.TnT()
         gradu = grad(u)
@@ -140,7 +148,7 @@ def setup_rots(mesh, comp=True):
         gradut = CoefficientFunction((grad(V)[0,0],grad(V)[0,1],grad(V)[1,0],grad(V)[1,1]), dims=[2,2])
     wmat = CoefficientFunction( (0, w, -w, 0), dims = (2,2) )
     wtmat = CoefficientFunction( (0, wt, -wt, 0), dims = (2,2) )
-    factor = {"fiber":1e6, "mat":1, "default":1}
+    factor = {"fiber":1e4, "mat":1, "default":1}
     cf_factor = CoefficientFunction( [ factor[mat] for mat in mesh.GetMaterials() ] )
     coef = cf_factor
     force = CoefficientFunction( (0, -0.0002) )
@@ -261,8 +269,8 @@ def test_case(tsol, tsup, mesh_func, title="unnamed"):
                 print('glob nrows: ', nd_to_row*fes.ndofglobal)
             TestKSP(fes, a, f, tsol, tsup, vfac=nd_to_v)
             if comm.rank==0:
-                print('---------------------\n')
-                print('\n---------------------')
+                print('---------------------')
+                print('---------------------')
                 print('KSP + RBM for '+title+CN+RN)
                 print('glob ND: ', fes.ndofglobal)
                 print('glob nrows: ', nd_to_row*fes.ndofglobal)
@@ -275,11 +283,11 @@ if __name__=='__main__':
     #meshfile = 'strips/strip_LF4_lay1.vol'
     meshfile = 'fibers1/2d_50fibers.vol'
     ngsglobals.msg_level = 1
-
+    comm = MPI_Init()
     petsc.InitPETSC()
     tsol, tsup = 0,0
     tsol, tsup = test_case(tsol, tsup, title = "BEAM", mesh_func = lambda : mesh_beam(0.1)) # maxh=0.1
+    tsol, tsup = test_case(tsol, tsup, title = "STRIP", mesh_func = lambda : mesh_strip(int(1e2))) # 1x100 strip
     tsol, tsup = test_case(tsol, tsup, title = "FIBER", mesh_func = lambda : mesh_fiber(15)) # 15 fibers
-    #tsol, tsup = test_case(tsol, tsup, title = "STRIP", mesh_func = lambda : mesh_strip(int(1e2))) # 1x100 strip
 
     
