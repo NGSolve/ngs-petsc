@@ -338,13 +338,6 @@ namespace petsc_if
     KSPSetOperators(ksp, petsc_mat, petsc_mat); //system-mat, mat for PC
     KSPSetFromOptions(ksp);
 
-    // KSPSetType(ksp, KSPCG);
-    // // rel, abs, div_tol, max_its
-    // KSPSetTolerances(ksp, 1e-12, 1e-30, PETSC_DEFAULT, 1e3);
-    PC petsc_prec;
-    // // PCSetType(petsc_prec, PCHYPRE);
-    // // PCSetType(petsc_prec, PCGAMG);
-    // // PCGAMGSetType(petsc_prec, PCGAMGAGG);
     {
       RegionTimer rt(t_sup);
       // if(MyMPI_GetId(pardofs->GetCommunicator())==0) cout << "KSP setup " << endl;
@@ -352,10 +345,6 @@ namespace petsc_if
       KSPSetUp(ksp);
     }
     
-    KSPGetPC(ksp, &petsc_prec);
-    PCType pct;
-    PCGetType(petsc_prec, &pct);
-    cout << "pc-type: " << pct << endl;
 
     double rtol, abstol, dtol; int maxits;
     KSPGetTolerances(ksp, &rtol, &abstol, &dtol, &maxits);
@@ -386,6 +375,9 @@ namespace petsc_if
 	add_entry("errs", py_r_l);
 	double res_n; KSPGetResidualNorm(ksp, &res_n);
 	add_entry("res_norm", py::float_(res_n));
+	PC petsc_prec; KSPGetPC(ksp, &petsc_prec);
+	PCType pct; PCGetType(petsc_prec, &pct);
+	add_entry("pc_used", py::str(string(pct)));
       }
     
 
