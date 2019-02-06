@@ -27,17 +27,33 @@ namespace petsc_if
     
   void STUPID_PETSC_INIT ()
   {
-    int argc = 1;
+    int argc = 2;
     const char* progname = "whatever..";
-    const char* opt = "-info";
+    const char* opt = "-log-view";
     typedef const char * pchar;
-    pchar ptrs[2] = { progname, nullptr };
+    pchar ptrs[3] = { progname, opt, nullptr };
     pchar * pptr = &ptrs[0];
     char** cpptr = (char**)pptr;
     PetscInitialize(&argc, &cpptr, NULL, NULL);
   }
 
+  void PETSC_INIT (FlatArray<string> petsc_options)
+  {
+    int argc = petsc_options.Size()+1;
+    const char* progname = "whatever..";
+    typedef const char * pchar;
+    // pchar ptrs[3] = { progname, opt, nullptr };
+    Array<pchar> ptrs(argc+1);
+    ptrs[0] = progname;
+    for(auto k:Range(argc-1))
+      ptrs[k+1] = petsc_options[k].c_str();
+    ptrs.Last() = NULL;
+    pchar * pptr = &ptrs[0];
+    char** cpptr = (char**)pptr;
+    PetscInitialize(&argc, &cpptr, NULL, NULL);
+  }
 
+  void PETSC_FINALIZE() { PetscFinalize(); }
   
   // Maps between ngsolve- and PETSc vector
   class PETSC_VecMap
@@ -252,8 +268,9 @@ namespace petsc_if
 
   // Does not work for compound spaces with different dims (which doesnt work anyways)
   void NGS_KSPSolve (shared_ptr<BilinearForm> blf, shared_ptr<BaseVector> rhs,
-  		     shared_ptr<BaseVector> sol, shared_ptr<BitArray> fds,
-  		     FlatArray<shared_ptr<BaseVector>> kvecs)
+		     shared_ptr<BaseVector> sol, shared_ptr<BitArray> fds,
+		     FlatArray<shared_ptr<BaseVector>> kvecs,
+		     py::dict* results = NULL)
   {
     static Timer t("KSP, total");
     static Timer t_sup("KSP - setup");
@@ -319,53 +336,58 @@ namespace petsc_if
     KSP ksp;
     KSPCreate(ngs_comm, &ksp);
     KSPSetOperators(ksp, petsc_mat, petsc_mat); //system-mat, mat for PC
-    KSPSetType(ksp, KSPCG);
+    KSPSetFromOptions(ksp);
+
+    // KSPSetType(ksp, KSPCG);
+    // // rel, abs, div_tol, max_its
+    // KSPSetTolerances(ksp, 1e-12, 1e-30, PETSC_DEFAULT, 1e3);
     PC petsc_prec;
-    KSPGetPC(ksp, &petsc_prec);
-    // PCSetType(petsc_prec, PCHYPRE);
-    PCSetType(petsc_prec, PCGAMG);
-    PCGAMGSetType(petsc_prec, PCGAMGAGG);
+    // // PCSetType(petsc_prec, PCHYPRE);
+    // // PCSetType(petsc_prec, PCGAMG);
+    // // PCGAMGSetType(petsc_prec, PCGAMGAGG);
     {
       RegionTimer rt(t_sup);
       // if(MyMPI_GetId(pardofs->GetCommunicator())==0) cout << "KSP setup " << endl;
+      //   KSPSetFromOptions(ksp);
       KSPSetUp(ksp);
     }
-    // rel, abs, div_tol, max_its
-    KSPSetTolerances(ksp, 1e-12, 1e-30, PETSC_DEFAULT, 1e3);
-    Array<double> resis(1e4);
-    resis = 0;
-    KSPSetResidualHistory(ksp, &resis[0], 1e4, PETSC_TRUE);
+    
+    KSPGetPC(ksp, &petsc_prec);
+    PCType pct;
+    PCGetType(petsc_prec, &pct);
+    cout << "pc-type: " << pct << endl;
+
+    double rtol, abstol, dtol; int maxits;
+    KSPGetTolerances(ksp, &rtol, &abstol, &dtol, &maxits);
+    int nerrs = maxits+1000;
+    Array<double> errs(nerrs);
+    KSPSetResidualHistory(ksp, &errs[0], nerrs, PETSC_TRUE);
+    
     {
       RegionTimer rt(t_sol);
       // if(MyMPI_GetId(pardofs->GetCommunicator())==0) cout << "KSP solve " << endl;
       KSPSolve(ksp, petsc_rhs, petsc_sol);
     }
-    int nits;
-    KSPGetIterationNumber(ksp, &nits);
-    double nres;
-    KSPGetResidualNorm(ksp, &nres);
-    KSPConvergedReason conv_r;
-    KSPGetConvergedReason(ksp, &conv_r);
-    
-    if(MyMPI_GetId(pardofs->GetCommunicator())==0) {
-      // cout << "-------" << endl;
-      // cout << "KSP results: " << endl;
-      // cout << "KSP errors: " << endl;
-      // int maxito = min2(nits, 50);
-      // for(auto k:Range(maxito)) cout << k << " = " << resis[k] << endl; 
-      // if(maxito<nits) {
-      // 	cout << "...." << endl;
-      // 	cout << nits-1 << " = " << resis[nits-1] << endl; 
-      // }
-      // cout << "-------" << endl;
-      cout << "--- KSP converged reason: " << name_reason(conv_r) << endl;
-      cout << "--- KSP needed its: " << nits << endl;
-      cout << "--- KSP err norm: " << nres << endl;
-      cout << "--- KSP err norm (rel): " << nres/resis[0] << endl;
-      // cout << "-------" << endl;
-    }
 
     col_map.P2N(sol, petsc_sol);
+
+    
+    // *results = py::dict();
+    if(results!=NULL)
+      {
+	auto add_entry = [&](string name, const py::object & o)
+	  { (*results)[name.c_str()] = o; };
+	KSPConvergedReason conv_r; KSPGetConvergedReason(ksp, &conv_r);
+	add_entry("conv_r", py::str(name_reason(conv_r)));
+	int nits; KSPGetIterationNumber(ksp, &nits);
+	add_entry("nits", py::int_(nits));
+	double* pr; int nr; KSPGetResidualHistory(ksp, &pr, &nr); //gets us nr of used res-entries!
+	auto py_r_l = py::list(); for(auto k:Range(nr)) py_r_l.append(py::float_(pr[k]));
+	add_entry("errs", py_r_l);
+	double res_n; KSPGetResidualNorm(ksp, &res_n);
+	add_entry("res_norm", py::float_(res_n));
+      }
+    
 
     // cout << "PETSC sol: " << endl;
     // VecView(petsc_sol, PETSC_VIEWER_STDOUT_WORLD);
@@ -374,18 +396,43 @@ namespace petsc_if
     // cout << "NGS sol (CUMUL): " << endl << *sol << endl;; 
   }
   
+  
   void NGS_DLL_HEADER ExportPETScInterface(py::module &m) {
     m.def("KSPSolve",
   	  [](shared_ptr<BilinearForm> blf, shared_ptr<BaseVector> rhs,
   	     shared_ptr<BaseVector> sol, shared_ptr<BitArray> fds,
-  	     py::list py_kvecs)
+  	     py::list py_kvecs, py::kwargs kwargs)
   	  {
+	    Array<string> opts;
+	    auto ValStr = [&](const py::object & Ob) -> string {
+	      if (py::isinstance<py::str>(Ob))
+		return Ob.cast<string>();
+	      if (py::isinstance<py::bool_>(Ob))
+		return Ob.cast<bool>()==true ? "1" : "0";
+	      if (py::isinstance<py::float_>(Ob) ||
+		  py::isinstance<py::int_>(Ob))
+		return py::str(Ob).cast<string>();
+	      return "COULD_NOT_CONVERT";
+	    };
+	    for(auto item : kwargs) {
+	      string name = "-" + item.first.cast<string>();
+	      opts.Append(name);
+	      string val = item.second.cast<string>();
+	      opts.Append(val);
+	    }
+	    // cout << "petsc-options: " << endl << opts << endl;
+	    // cout << endl << endl;
+	    PETSC_INIT(opts);
   	    Array<shared_ptr<BaseVector>> kvecs = makeCArraySharedPtr<shared_ptr<BaseVector>>(py_kvecs);;
-  	    NGS_KSPSolve(blf, rhs, sol, fds, kvecs);
+	    auto results = py::dict();
+	    results[string("petsc_opts").c_str()] = py::dict(kwargs);
+	    NGS_KSPSolve(blf, rhs, sol, fds, kvecs, &results);
+	    PETSC_FINALIZE();
+	    return results;
   	  }, py::arg("blf")=nullptr, py::arg("rhs")=nullptr,
   	  py::arg("sol")=nullptr, py::arg("fds")=nullptr,
   	  py::arg("kvecs")=py::list());
-    m.def("InitPETSC", [] () { STUPID_PETSC_INIT(); } );
+    m.def("InitPETSC", [] () { /** STUPID_PETSC_INIT(); **/ } );
   }
 
 }

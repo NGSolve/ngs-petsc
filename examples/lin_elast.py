@@ -212,7 +212,7 @@ def rb_modes(fes, comp=False, rots=False):
 
 # C++ timers are not reset between calls, so we use tsol, tsup
 # to keep track
-def TestKSP(fes, a, f, tsol, tsup, kvecs=list(), vfac=1):
+def TestKSP(fes, a, f, tsol, tsup, opts = {}, kvecs=list(), vfac=1):
     comm = MPI_Init()
     gfu = GridFunction(fes)
     # calculare residuum to confirm correctness of KSP-solve
@@ -227,7 +227,7 @@ def TestKSP(fes, a, f, tsol, tsup, kvecs=list(), vfac=1):
     nr_init = Norm(p_res)
     if comm.rank==0:
         print('------- init. norm res ', nr_init)
-    petsc.KSPSolve(blf=a, rhs=f.vec, sol=gfu.vec, fds=fes.FreeDofs(), kvecs=kvecs)
+    ksp_res = petsc.KSPSolve(blf=a, rhs=f.vec, sol=gfu.vec, fds=fes.FreeDofs(), kvecs=kvecs, **opts)
     ts = {t['name'] : t for t in Timers()}
     t_ksp_sup = comm.Max(ts['KSP - setup']['time']) - tsup
     tsup += t_ksp_sup
@@ -249,45 +249,65 @@ def TestKSP(fes, a, f, tsol, tsup, kvecs=list(), vfac=1):
     if comm.rank==0:
         print('------- fin.  norm res ', nr)
         print('------- rel. norm res ', nr/nr_init)
-    return tsol, tsup
+    return tsol, tsup, ksp_res
 
-def test_case(tsol, tsup, mesh_func, title="unnamed"):
+
+def test_case(tsol, tsup, mesh_func, title="unnamed",
+              do_test = lambda C,R,K : True,
+              ksp_opts = lambda C,R,K : {} ):
+
+    C_label = {True : '_comp', False :'_mdim'}
+    R_label = {True : '_with_rot', False :'_no_rot'}
+    K_label = {True : ' + RBM', False : ''}
     comm = MPI_Init()
     mesh = ParMesh(mesh_func)
-    for C,CN in [(True, '_comp'), (False,'_mdim')]:
-        for R, RN in [(True, '_rots'), (False,'_norots')]:
+    for C in [True, False]:
+        for R in [True, False]:
+            if not do_test(C,R,False) and not do_test(C,R,True):
+                continue;
             fes, a, f = setup(mesh, comp=C, rots=R)
             kvecs = rb_modes(fes, comp=C, rots=R)
             nd_to_v = 1/3 if R else 1/2
             nd_to_v = nd_to_v if C else 1
             nd_to_row = 3 if R else 2
             nd_to_row = 1 if C else nd_to_row
-            if comm.rank==0:
-                print('\n---------------------')
-                print('KSP for '+title+CN+RN)
-                print('glob ND: ', fes.ndofglobal)
-                print('glob nrows: ', nd_to_row*fes.ndofglobal)
-            TestKSP(fes, a, f, tsol, tsup, vfac=nd_to_v)
-            if comm.rank==0:
-                print('---------------------')
-                print('---------------------')
-                print('KSP + RBM for '+title+CN+RN)
-                print('glob ND: ', fes.ndofglobal)
-                print('glob nrows: ', nd_to_row*fes.ndofglobal)
-            TestKSP(fes, a, f, tsol, tsup, kvecs, vfac=nd_to_v)
-            if comm.rank==0:
-                print('---------------------\n')
+            for K in [True, False]:
+                if not do_test(C,R,K):
+                    continue;
+                opts = ksp_opts(C,R,K)
+                if comm.rank==0:
+                    print('\n---------------------')
+                    print('KSP for '+title+C_label[C]+R_label[R]+K_label[K])
+                    print('glob ND: ', fes.ndofglobal)
+                    print('glob nrows: ', nd_to_row*fes.ndofglobal)
+                tsol, tsup, res = TestKSP(fes, a, f, tsol, tsup, vfac=nd_to_v, opts=opts)
+                if comm.rank==0:
+                    print('converged:', res['conv_r'])
+                    print('nits:', res['nits'])
+                    print('res_norm:', res['res_norm'])
+                    print('---------------------\n')
     return tsol, tsup
 
+
 if __name__=='__main__':
-    #meshfile = 'strips/strip_LF4_lay1.vol'
-    meshfile = 'fibers1/2d_50fibers.vol'
+
+    def_opts = lambda C,R,K : {"pc_type" : "gamg"}
+    def_tests = lambda C,R,K : True
+
+    hypre_opts = lambda C,R,K : {"pc_type" : "hypre", "pc_hypre_type" : "boomeramg",
+                                 "pc_hypre_boomeramg_nodal_coarsen" : "3",
+                                 "pc_hypre_boomeramg_vec_interp_variant" : "3"}
+    hypre_tests = lambda C,R,K : not C and R and K
+    
     ngsglobals.msg_level = 1
     comm = MPI_Init()
     petsc.InitPETSC()
     tsol, tsup = 0,0
-    tsol, tsup = test_case(tsol, tsup, title = "BEAM", mesh_func = lambda : mesh_beam(0.1)) # maxh=0.1
-    tsol, tsup = test_case(tsol, tsup, title = "STRIP", mesh_func = lambda : mesh_strip(int(1e2))) # 1x100 strip
-    tsol, tsup = test_case(tsol, tsup, title = "FIBER", mesh_func = lambda : mesh_fiber(15)) # 15 fibers
+    tsol, tsup = test_case(tsol, tsup, title = "BEAM", mesh_func = lambda : mesh_beam(0.1),
+                           do_test = hypre_tests, ksp_opts = hypre_opts)
+    tsol, tsup = test_case(tsol, tsup, title = "STRIP", mesh_func = lambda : mesh_strip(int(1e2)), # 1x100 strip
+                           do_test = hypre_tests, ksp_opts = hypre_opts)
+    tsol, tsup = test_case(tsol, tsup, title = "FIBER", mesh_func = lambda : mesh_fiber(15), # 15 fibers
+                           do_test = hypre_tests, ksp_opts = hypre_opts)
 
     
