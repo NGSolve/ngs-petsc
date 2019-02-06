@@ -25,8 +25,9 @@ gfu = GridFunction(V)
 
 opts = {"ksp_type":"cg", "ksp_atol":"1e-30", "ksp_rtol":"1e-14", "pc_type":"gamg"}
 ksp_res = petsc.KSPSolve(blf=a, rhs=f.vec, sol=gfu.vec, fds=V.FreeDofs(), **opts)
-print('PETSc took nits:', ksp_res['nits'])
-print('init. norm res: ', ksp_res['errs'][0])
-print(' fin. norm res: ', ksp_res['res_norm'])
+if comm.rank==0:
+    print('PETSc took nits:', ksp_res['nits'])
+    print('init. norm res: ', ksp_res['errs'][0])
+    print(' fin. norm res: ', ksp_res['res_norm'])
 
 Draw(gfu, name='sol')
