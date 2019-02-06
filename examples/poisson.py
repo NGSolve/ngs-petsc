@@ -12,6 +12,7 @@ def make_mesh():
     return Mesh(ngm)
 
 
+comm = MPI_Init()
 mesh = make_mesh()
 V = H1(mesh, order=1, dirichlet='.*')
 u,v = V.TnT()
