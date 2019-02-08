@@ -402,5 +402,10 @@ namespace ngs_petsc_interface
   	  py::arg("kvecs")=py::list());
   }
 
+  PYBIND11_MODULE(ngspetsc, m)
+  {
+    ExportPETScInterface(m);
+  }
+  
 }
 

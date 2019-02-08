@@ -2,9 +2,7 @@ project(ngspetsc)
 
 cmake_minimum_required(VERSION 3.8)
 
-#add_library(ngspetsc SHARED petsc_interface.cpp python_petsc_if.cpp)
-
-add_ngsolve_python_module(ngspetsc SHARED petsc_interface.cpp python_petsc_if.cpp)
+add_ngsolve_python_module(ngspetsc SHARED petsc_interface.cpp)
 
 include_directories(${PETSC_INCLUDES})
 
