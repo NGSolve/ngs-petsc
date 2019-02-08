@@ -9,6 +9,10 @@ find_package(NGSolve CONFIG REQUIRED
   HINTS $ENV{NETGENDIR}/.. /opt/netgen/ /Applications/Netgen.app/Contents/Resources/CMake C:/netgen
 )
 
+if(NOT NETGEN_USE_MPI)
+  message(FATAL_ERROR "NGSolve version found in ${NGSOLVE_DIR} was not built with MPI support!")
+endif(NOT NETGEN_USE_MPI)
+
 find_package(PETSc REQUIRED)
 
 # check if CMAKE_INSTALL_PREFIX is set by user, if not install in NGSolve python dir
