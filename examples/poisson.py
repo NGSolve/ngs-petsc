@@ -3,11 +3,12 @@ import ngspetsc as petsc
 from netgen.meshing import Mesh as NGMesh
 
 comm = MPI_Init()
-ngm = NGMesh(dim=2)
 if comm.rank==0:
     from netgen.geom2d import unit_square
     ngm = unit_square.GenerateMesh(maxh=0.01)
-ngm.Distribute()
+    ngm.Distribute(comm)
+else:
+    ngm = NGMesh.ReceiveMesh(comm)
 mesh = Mesh(ngm)
 comm = MPI_Init()
 V = H1(mesh, order=1, dirichlet='.*')

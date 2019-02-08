@@ -33,13 +33,12 @@ from netgen.meshing import Mesh as NGMesh
 from ngsolve.meshes import MakeStructured2DMesh
 
 # master meshes, then we distribute
-def ParMesh(mesh_func):
-    comm = MPI_Init()
-    ngmesh = NGMesh(dim=2)
+def ParMesh(mesh_func, comm):
     if comm.rank==0:
         ngmesh = mesh_func()
-    comm.Barrier()
-    ngmesh.Distribute(comm)
+        ngmesh.Distribute(comm)
+    else:
+        ngmesh = NGMesh.ReceiveMesh(comm)
     return Mesh(ngmesh)
     
 # geom 1: BEAM
@@ -213,7 +212,7 @@ def rb_modes(fes, comp=False, rots=False):
 # C++ timers are not reset between calls, so we use tsol, tsup
 # to keep track
 def TestKSP(fes, a, f, tsol, tsup, opts = {}, kvecs=list(), vfac=1):
-    comm = MPI_Init()
+    comm = fes.mesh.comm
     gfu = GridFunction(fes)
     # calculare residuum to confirm correctness of KSP-solve
     P = Projector(fes.FreeDofs(), True)
@@ -260,7 +259,7 @@ def test_case(tsol, tsup, mesh_func, title="unnamed",
     R_label = {True : '_with_rot', False :'_no_rot'}
     K_label = {True : ' + RBM', False : ''}
     comm = MPI_Init()
-    mesh = ParMesh(mesh_func)
+    mesh = ParMesh(mesh_func, comm)
     for C in [True, False]:
         for R in [True, False]:
             if not do_test(C,R,False) and not do_test(C,R,True):
@@ -297,7 +296,7 @@ if __name__=='__main__':
     hypre_opts = lambda C,R,K : {"pc_type" : "hypre", "pc_hypre_type" : "boomeramg",
                                  "pc_hypre_boomeramg_nodal_coarsen" : 3,
                                  "pc_hypre_boomeramg_vec_interp_variant" : 3}
-    hypre_tests = lambda C,R,K : not C and R and K
+    hypre_tests = lambda C,R,K : not C 
     
     ngsglobals.msg_level = 1
     comm = MPI_Init()
