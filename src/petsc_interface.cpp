@@ -39,7 +39,6 @@ namespace ngs_petsc_interface
 
 
 
-
   void InitializePETSc (FlatArray<string> options)
   {
     int argc = options.Size()+1;
@@ -56,6 +55,8 @@ namespace ngs_petsc_interface
   }
 
   void FinalizePETSc() { PetscFinalize(); }
+
+
   
   // Maps between ngsolve- and PETSc vector
   class Ngs2PETScVecMap
@@ -127,6 +128,7 @@ namespace ngs_petsc_interface
     }
   };
 
+  
 
   template<class TM> INLINE typename ngs::mat_traits<TM>::TSCAL* get_ptr(TM & val) { return &val(0,0); }
   template<> INLINE ngs::mat_traits<double>::TSCAL* get_ptr<double>(double & val) { return &val; }
@@ -359,6 +361,7 @@ namespace ngs_petsc_interface
 
     return results;
   }
+
   
   
   void NGS_DLL_HEADER ExportPETScInterface(py::module &m) {
