@@ -57,7 +57,7 @@ def mesh_strip(Lf):
     #workaround: set NGS-comm to local comm
     comm = MPI_Init()
     sc = comm.SubComm([0])
-    from ngsolve.ngstd import SetNGSComm
+    from ngsolve.comp import SetNGSComm
     SetNGSComm(sc)
     ngs_mesh = MakeStructured2DMesh(quads=False, nx=Lf, ny=1, mapping=lambda x,y : (Lf*x,y))
     mesh = ngs_mesh.ngmesh
@@ -227,7 +227,7 @@ def TestKSP(fes, a, f, tsol, tsup, opts = {}, kvecs=list(), vfac=1):
     nr_init = Norm(p_res)
     if comm.rank==0:
         print('------- init. norm res ', nr_init)
-    ksp_res = petsc.KSPSolve(blf=a, rhs=f.vec, sol=gfu.vec, fds=fes.FreeDofs(), kvecs=kvecs, **opts)
+    ksp_res = petsc.KSPSolve(mat=a.mat, rhs=f.vec, sol=gfu.vec, fds=fes.FreeDofs(), kvecs=kvecs, **opts)
     ts = {t['name'] : t for t in Timers()}
     t_ksp_sup = comm.Max(ts['KSP - setup']['time']) - tsup
     tsup += t_ksp_sup
@@ -295,13 +295,12 @@ if __name__=='__main__':
     def_tests = lambda C,R,K : True
 
     hypre_opts = lambda C,R,K : {"pc_type" : "hypre", "pc_hypre_type" : "boomeramg",
-                                 "pc_hypre_boomeramg_nodal_coarsen" : "3",
-                                 "pc_hypre_boomeramg_vec_interp_variant" : "3"}
+                                 "pc_hypre_boomeramg_nodal_coarsen" : 3,
+                                 "pc_hypre_boomeramg_vec_interp_variant" : 3}
     hypre_tests = lambda C,R,K : not C and R and K
     
     ngsglobals.msg_level = 1
     comm = MPI_Init()
-    petsc.InitPETSC()
     tsol, tsup = 0,0
     tsol, tsup = test_case(tsol, tsup, title = "BEAM", mesh_func = lambda : mesh_beam(0.1),
                            do_test = hypre_tests, ksp_opts = hypre_opts)
