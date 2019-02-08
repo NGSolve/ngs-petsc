@@ -93,20 +93,23 @@ namespace ngs_petsc_interface
   	throw Exception("Inconsistent numbering!");
       }
     }
+
     Ngs2PETScVecMap (shared_ptr<ngs::ParallelDofs> _pardofs,
 		     shared_ptr<ngs::BitArray> take_dofs,
 		     int _low, int _high, int _glob)
       : Ngs2PETScVecMap(1, _pardofs, take_dofs, _low, _high, _glob)
     { }
+
     shared_ptr<ngs::ParallelDofs> GetParallelDofs () const { return pardofs; }
-    ::Vec CreatePETScVec ()
+    Vec CreatePETScVec ()
     {
-      ::Vec v;
+      Vec v;
       VecCreateMPI(pardofs->GetCommunicator(), loc, glob, &v);
       return v;
     };
+
     // ngsolve -> petsc
-    void Ngs2PETSc (shared_ptr<ngs::BaseVector> ngs_vec, ::Vec petsc_vec)
+    void Ngs2PETSc (shared_ptr<ngs::BaseVector> ngs_vec, Vec petsc_vec)
     {
       ngs_vec->Cumulate();
       VecAssemblyBegin(petsc_vec);
@@ -116,8 +119,9 @@ namespace ngs_petsc_interface
       VecSetValues(petsc_vec, loc, &glob_nums[0], &buf[0], INSERT_VALUES);
       VecAssemblyEnd(petsc_vec);
     }
+
     // petsc -> ngsolve
-    void PETSc2Ngs (shared_ptr<ngs::BaseVector> ngs_vec, ::Vec petsc_vec)
+    void PETSc2Ngs (shared_ptr<ngs::BaseVector> ngs_vec, Vec petsc_vec)
     {
       ngs_vec->Distribute();
       VecGetValues(petsc_vec, loc, &glob_nums[0], &buf[0]);
@@ -134,7 +138,7 @@ namespace ngs_petsc_interface
   template<> INLINE ngs::mat_traits<double>::TSCAL* get_ptr<double>(double & val) { return &val; }
   
   template<class TM>
-  ::Mat CreatePETScMatSeqBAIJ (shared_ptr<ngs::SparseMatrixTM<TM>> spmat,
+  Mat CreatePETScMatSeqBAIJ (shared_ptr<ngs::SparseMatrixTM<TM>> spmat,
 			       shared_ptr<ngs::BitArray> take_dofs)
   {
     PetscInt bs = ngs::mat_traits<TM>::HEIGHT;
@@ -160,7 +164,7 @@ namespace ngs_petsc_interface
       for (auto j : ris)
   	if(!take_dofs || take_dofs->Test(j)) c++;
     }
-    ::Mat petsc_mat;
+    Mat petsc_mat;
     MatCreateSeqBAIJ(PETSC_COMM_SELF, bs, nrows, nrows, -1, &nzepr[0], &petsc_mat); 
     int n_b_entries = 0;
     for (auto k : Range(nb)) n_b_entries += nzepr[k];
@@ -194,7 +198,7 @@ namespace ngs_petsc_interface
   }
 
 
-  ::Mat CreatePETScMatSeq (shared_ptr<ngs::BaseMatrix> mat,
+  Mat CreatePETScMatSeq (shared_ptr<ngs::BaseMatrix> mat,
 			   shared_ptr<ngs::BitArray> fds)
   {
     if (auto spm = dynamic_pointer_cast<ngs::SparseMatrixTM<double>>(mat))
@@ -210,11 +214,11 @@ namespace ngs_petsc_interface
     if (auto spm = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<6>>>(mat))
       return CreatePETScMatSeqBAIJ(spm, fds);
     throw Exception("Cannot make PETSc-Mat from this NGSolve-Mat!");
-    return ::Mat(NULL);
+    return Mat(NULL);
   }
   
   
-  ::Mat CreatePETScMatIS(int abs, shared_ptr<ngs::ParallelDofs> pardofs, 
+  Mat CreatePETScMatIS(int abs, shared_ptr<ngs::ParallelDofs> pardofs,
 			 shared_ptr<BitArray> take_dofs)
   {
     PetscInt bs = abs;
@@ -237,7 +241,7 @@ namespace ngs_petsc_interface
     for (auto k : Range(pardofs->GetNDofLocal()))
       if((!take_dofs || take_dofs->Test(k)) && pardofs->IsMasterDof(k)) loc_nfd_m++;
     PetscInt loc_nfr_m = loc_nfd_m * bs;
-    ::Mat petsc_mat;
+    Mat petsc_mat;
     MatCreateIS(comm, bs, loc_nfr_m, loc_nfr_m, glob_nrows, glob_nrows, petsc_map, NULL, &petsc_mat);
     return petsc_mat;
   }
@@ -263,9 +267,9 @@ namespace ngs_petsc_interface
     // cout << "ndof " << pardofs->GetNDofLocal() << "  " << pardofs->GetNDofGlobal() << endl;
     // cout << "fds: " << fds; if(fds) cout << " set: " << fds->NumSet(); cout << endl;
     
-    ::Mat petsc_mat_loc = CreatePETScMatSeq(parmat->GetMatrix(), fds);
+    Mat petsc_mat_loc = CreatePETScMatSeq(parmat->GetMatrix(), fds);
     int bs; MatGetBlockSize(petsc_mat_loc, &bs);
-    ::Mat petsc_mat = CreatePETScMatIS(bs, pardofs, fds);
+    Mat petsc_mat = CreatePETScMatIS(bs, pardofs, fds);
     MatISSetLocalMat(petsc_mat, petsc_mat_loc);
     MatAssemblyBegin(petsc_mat, MAT_FINAL_ASSEMBLY);
     MatAssemblyEnd(petsc_mat, MAT_FINAL_ASSEMBLY);
@@ -282,13 +286,13 @@ namespace ngs_petsc_interface
     
     Ngs2PETScVecMap row_map (bs, mat->GetParallelDofs(), fds, row_low, row_high, glob_nr);
     Ngs2PETScVecMap &col_map(row_map);
-    ::Vec petsc_rhs = row_map.CreatePETScVec(), petsc_sol = col_map.CreatePETScVec();
+    Vec petsc_rhs = row_map.CreatePETScVec(), petsc_sol = col_map.CreatePETScVec();
     row_map.Ngs2PETSc(rhs, petsc_rhs);
 
     if (kvecs.Size()) 
       {
   	int dimK = kvecs.Size();
-  	Array<::Vec> petsc_kvecs(dimK);
+  	Array<Vec> petsc_kvecs(dimK);
   	for (auto k : Range(dimK)) {
   	  petsc_kvecs[k] = col_map.CreatePETScVec();
   	  row_map.Ngs2PETSc(kvecs[k], petsc_kvecs[k]);
@@ -363,9 +367,11 @@ namespace ngs_petsc_interface
     return results;
   }
 
+} // namespace ngs_petsc_interface
   
   
-  void NGS_DLL_HEADER ExportPETScInterface(py::module &m) {
+PYBIND11_MODULE(ngspetsc, m)
+{
     m.def("KSPSolve",
   	  [](shared_ptr<ngs::BaseMatrix> mat, shared_ptr<ngs::BaseVector> rhs,
   	     shared_ptr<ngs::BaseVector> sol, shared_ptr<BitArray> fds,
@@ -400,7 +406,6 @@ namespace ngs_petsc_interface
   	  }, py::arg("mat")=nullptr, py::arg("rhs")=nullptr,
   	  py::arg("sol")=nullptr, py::arg("fds")=nullptr,
   	  py::arg("kvecs")=py::list());
-  }
-
 }
+
 
