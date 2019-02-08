@@ -1,7 +1,7 @@
 #include <comp.hpp>
 #include <python_ngstd.hpp> 
 
-namespace petsc_if { void NGS_DLL_HEADER ExportPETScInterface(py::module &m); }
+namespace ngs_petsc_interface { void NGS_DLL_HEADER ExportPETScInterface(py::module &m); }
 
 PYBIND11_MODULE(ngspetsc, m)
 {

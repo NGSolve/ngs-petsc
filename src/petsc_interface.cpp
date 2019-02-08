@@ -4,7 +4,7 @@
 #include <python_ngstd.hpp> 
 
 
-namespace petsc_if
+namespace ngs_petsc_interface
 {
   namespace ngs = ngcomp;
   using ngs::Array;
