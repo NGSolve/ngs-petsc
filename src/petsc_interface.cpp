@@ -31,7 +31,8 @@ namespace ngs_petsc_interface
       case(KSP_DIVERGED_INDEFINITE_PC   ): return "KSP_DIVERGED_INDEFINITE_PC   ";
       case(KSP_DIVERGED_NANORINF        ): return "KSP_DIVERGED_NANORINF        ";
       case(KSP_DIVERGED_INDEFINITE_MAT  ): return "KSP_DIVERGED_INDEFINITE_MAT  ";
-      case(KSP_DIVERGED_PC_FAILED       ): return "KSP_DIVERGED_PC_FAILED       ";
+//       case(KSP_DIVERGED_PC_FAILED       ): return "KSP_DIVERGED_PC_FAILED       "; // NEW
+//       case(KSP_DIVERGED_PCSETUP_FAILED  ): return "KSP_DIVERGED_PCSETUP_FAILED  "; // OLD
       case(KSP_CONVERGED_ITERATING      ): return "KSP_CONVERGED_ITERATING      ";
       default:  return "unknown reason??";
       }
