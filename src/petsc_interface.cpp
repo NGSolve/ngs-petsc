@@ -62,9 +62,9 @@ namespace ngs_petsc_interface
   class Ngs2PETScVecMap
   {
     shared_ptr<ngs::ParallelDofs> pardofs;
-    int low, high, loc, glob;
-    Array<int> loc_inds, glob_nums;
-    Array<double> buf;
+    size_t low, high, loc, glob;
+    Array<PetscInt> loc_inds, glob_nums;
+    Array<PetscScalar> buf;
   public:
     /**
        Have [low .. high) of PETSc vec. These map to set DOFs of take_dofs.
@@ -72,7 +72,7 @@ namespace ngs_petsc_interface
     **/
     Ngs2PETScVecMap (int bs, shared_ptr<ngs::ParallelDofs> _pardofs,
 		     shared_ptr<ngs::BitArray> take_dofs,
-		     int _low, int _high, int _glob)
+		     size_t _low, size_t _high, size_t _glob)
       : pardofs(_pardofs), low(_low), high(_high), loc(_high-_low), glob(_glob)
     {
       loc_inds.SetSize(loc);
@@ -137,7 +137,7 @@ namespace ngs_petsc_interface
   ::Mat CreatePETScMatSeqBAIJ (shared_ptr<ngs::SparseMatrixTM<TM>> spmat,
 			       shared_ptr<ngs::BitArray> take_dofs)
   {
-    int bs = ngs::mat_traits<TM>::HEIGHT;
+    PetscInt bs = ngs::mat_traits<TM>::HEIGHT;
     int bss = bs*bs;
     int nb_tot = spmat->Height();
     int nrows_tot = nb_tot * bs;
@@ -146,11 +146,11 @@ namespace ngs_petsc_interface
     compress = -1;
     for (auto k : Range(nb_tot))
       if(!take_dofs || take_dofs->Test(k)) compress[k] = nb++;
-    int nrows = nb * bs;
+    PetscInt nrows = nb * bs;
     // cout << "loc BAIJ-Mat, nb_tot " << nb_tot << " " << nb << endl;
     // cout << "bs: " << bs << " " << bsS << endl;
     // cout << "loc BAIJ-Mat, nrows_tot " << nrows_tot << " " << nr << endl;
-    Array<int> nzepr(nb);
+    Array<PetscInt> nzepr(nb);
     nzepr = 0;
     nb = 0;
     for (auto k : Range(nb_tot)) {
@@ -164,7 +164,7 @@ namespace ngs_petsc_interface
     MatCreateSeqBAIJ(PETSC_COMM_SELF, bs, nrows, nrows, -1, &nzepr[0], &petsc_mat); 
     int n_b_entries = 0;
     for (auto k : Range(nb)) n_b_entries += nzepr[k];
-    Array<int> cols(n_b_entries);
+    Array<PetscInt> cols(n_b_entries);
     n_b_entries = 0;
     for (auto k : Range(nb_tot)) {
       if(take_dofs && !take_dofs->Test(k)) continue;
@@ -174,14 +174,14 @@ namespace ngs_petsc_interface
     MatSeqBAIJSetColumnIndices(petsc_mat, &cols[0]);
     size_t len_vals = 0;
     for (auto k : Range(nb_tot)) {
-      int ck = compress[k];
+      PetscInt ck = compress[k];
       if(ck==-1) continue;
       auto ris = spmat->GetRowIndices(k);
       auto rvs = spmat->GetRowValues(k);
       for (auto j : Range(ris.Size())) {
-  	int cj = compress[ris[j]];
+  	PetscInt cj = compress[ris[j]];
   	if(cj==-1) continue;
-  	double* data = get_ptr(rvs[j]);
+  	PetscScalar* data = get_ptr(rvs[j]);
   	MatSetValuesBlocked(petsc_mat, 1, &ck, 1, &cj, data, INSERT_VALUES);
       }
     }
@@ -214,17 +214,18 @@ namespace ngs_petsc_interface
   }
   
   
-  ::Mat CreatePETScMatIS(int bs, shared_ptr<ngs::ParallelDofs> pardofs, 
+  ::Mat CreatePETScMatIS(int abs, shared_ptr<ngs::ParallelDofs> pardofs, 
 			 shared_ptr<BitArray> take_dofs)
   {
+    PetscInt bs = abs;
     int glob_nd;
     Array<int> globnums;
     pardofs->EnumerateGlobally(take_dofs, globnums, glob_nd);
-    int glob_nr = glob_nd * bs;
+    PetscInt glob_nrows = glob_nd * bs;
     MPI_Comm comm = pardofs->GetCommunicator();
-    Array<int> compress_globnums(take_dofs ? take_dofs->NumSet() : pardofs->GetNDofLocal());
+    Array<PetscInt> compress_globnums(take_dofs ? take_dofs->NumSet() : pardofs->GetNDofLocal());
     // map needs number of local FREE dofs
-    int loc_nfd = 0;
+    PetscInt loc_nfd = 0;
     for (auto k : Range(pardofs->GetNDofLocal()))
       if(globnums[k]!=-1)
   	compress_globnums[loc_nfd++] = globnums[k];
@@ -235,9 +236,9 @@ namespace ngs_petsc_interface
     int loc_nfd_m = 0;
     for (auto k : Range(pardofs->GetNDofLocal()))
       if((!take_dofs || take_dofs->Test(k)) && pardofs->IsMasterDof(k)) loc_nfd_m++;
-    int loc_nfr_m = loc_nfd_m * bs;
+    PetscInt loc_nfr_m = loc_nfd_m * bs;
     ::Mat petsc_mat;
-    MatCreateIS(comm, bs, loc_nfr_m, loc_nfr_m, glob_nr, glob_nr, petsc_map, NULL, &petsc_mat);
+    MatCreateIS(comm, bs, loc_nfr_m, loc_nfr_m, glob_nrows, glob_nrows, petsc_map, NULL, &petsc_mat);
     return petsc_mat;
   }
 
@@ -248,10 +249,10 @@ namespace ngs_petsc_interface
 			 shared_ptr<ngs::BaseVector> sol, shared_ptr<ngs::BitArray> fds,
 			 FlatArray<shared_ptr<ngs::BaseVector>> kvecs)
   {
-    static Timer t("KSP, total");
-    static Timer t_sup("KSP - setup");
-    static Timer t_sol("KSP - solve");
-    RegionTimer rt(t);
+    static ngs::Timer t("KSP, total");
+    static ngs::Timer t_sup("KSP - setup");
+    static ngs::Timer t_sol("KSP - solve");
+    ngs::RegionTimer rt(t);
     
     // fds = nullptr;
     auto parmat = dynamic_pointer_cast<ngs::ParallelMatrix>(mat);
@@ -273,11 +274,11 @@ namespace ngs_petsc_interface
     if(bs!=1) MatSetBlockSize(petsc_mat, bs);
     // MatConvert(petsc_mat, (bs!=1) ? MATMPIBAIJ : MPIAIJ, MAT_INPLACE_MATRIX, &petsc_mat); //doesnt work with GAMG?
 
-    int row_low, row_high;
+    PetscInt row_low, row_high;
     MatGetOwnershipRange(petsc_mat, &row_low, &row_high);
-    int glob_nr, glob_nc;
+    PetscInt glob_nr, glob_nc;
     MatGetSize(petsc_mat, &glob_nr, &glob_nc);
-    int col_low = row_low, col_high = row_high;
+    PetscInt col_low = row_low, col_high = row_high;
     
     Ngs2PETScVecMap row_map (bs, mat->GetParallelDofs(), fds, row_low, row_high, glob_nr);
     Ngs2PETScVecMap &col_map(row_map);
@@ -313,21 +314,21 @@ namespace ngs_petsc_interface
     KSPSetFromOptions(ksp);
 
     {
-      RegionTimer rt(t_sup);
+      ngs::RegionTimer rt(t_sup);
       // if(MyMPI_GetId(comm)==0) cout << "KSP setup " << endl;
       //   KSPSetFromOptions(ksp);
       KSPSetUp(ksp);
     }
     
 
-    double rtol, abstol, dtol; int maxits;
+    PetscScalar rtol, abstol, dtol; PetscInt maxits;
     KSPGetTolerances(ksp, &rtol, &abstol, &dtol, &maxits);
     int nerrs = maxits+1000;
-    Array<double> errs(nerrs);
+    Array<PetscScalar> errs(nerrs);
     KSPSetResidualHistory(ksp, &errs[0], nerrs, PETSC_TRUE);
     
     {
-      RegionTimer rt(t_sol);
+      ngs::RegionTimer rt(t_sol);
       // if(MyMPI_GetId(comm)==0) cout << "KSP solve " << endl;
       KSPSolve(ksp, petsc_rhs, petsc_sol);
     }
@@ -341,12 +342,12 @@ namespace ngs_petsc_interface
 	{ results[name] = o; };
       KSPConvergedReason conv_r; KSPGetConvergedReason(ksp, &conv_r);
       results["conv_r"] = py::str(name_reason(conv_r));
-      int nits; KSPGetIterationNumber(ksp, &nits);
+      PetscInt nits; KSPGetIterationNumber(ksp, &nits);
       results["nits"] = py::int_(nits);
-      double* pr; int nr; KSPGetResidualHistory(ksp, &pr, &nr); //gets us nr of used res-entries!
+      PetscScalar* pr; PetscInt nr; KSPGetResidualHistory(ksp, &pr, &nr); //gets us nr of used res-entries!
       auto py_r_l = py::list(); for (auto k : Range(nr)) py_r_l.append(py::float_(pr[k]));
       results["errs"] = py_r_l;
-      double res_n; KSPGetResidualNorm(ksp, &res_n);
+      PetscScalar res_n; KSPGetResidualNorm(ksp, &res_n);
       results["res_norm"] =  py::float_(res_n);
       PC petsc_prec; KSPGetPC(ksp, &petsc_prec);
       PCType pct; PCGetType(petsc_prec, &pct);
