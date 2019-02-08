@@ -6,5 +6,5 @@ namespace ngs_petsc_interface { void NGS_DLL_HEADER ExportPETScInterface(py::mod
 PYBIND11_MODULE(ngspetsc, m)
 {
   m.attr("__name__") = "NgsPETScInterface";
-  petsc_if::ExportPETScInterface(m);
+  ngs_petsc_interface::ExportPETScInterface(m);
 }

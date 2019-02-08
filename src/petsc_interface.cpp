@@ -13,30 +13,30 @@ namespace ngs_petsc_interface
   INLINE string name_reason (KSPConvergedReason r) {
     switch(r)
       {
-      case(KSP_CONVERGED_ITERATING)       : return "KSP_CONVERGED_ITERATING";
-      case(KSP_CONVERGED_RTOL_NORMAL)     : return "KSP_CONVERGED_RTOL_NORMAL";
-      case(KSP_CONVERGED_ATOL_NORMAL)     : return "KSP_CONVERGED_ATOL_NORMAL";
-      case(KSP_CONVERGED_RTOL)            : return "KSP_CONVERGED_RTOL";
-      case(KSP_CONVERGED_ATOL)            : return "KSP_CONVERGED_ATOL";
-      case(KSP_CONVERGED_ITS)             : return "KSP_CONVERGED_ITS";
-      case(KSP_CONVERGED_CG_NEG_CURVE)    : return "KSP_CONVERGED_CG_NEG_CURVE";
-      case(KSP_CONVERGED_CG_CONSTRAINED)  : return "KSP_CONVERGED_CG_CONSTRAINED";
-      case(KSP_CONVERGED_STEP_LENGTH)     : return "KSP_CONVERGED_STEP_LENGTH";
-      case(KSP_CONVERGED_HAPPY_BREAKDOWN) : return "KSP_CONVERGED_HAPPY_BREAKDOWN";
-      case(KSP_DIVERGED_NULL)             : return "KSP_DIVERGED_NULL";
-      case(KSP_DIVERGED_ITS)		  : return "KSP_DIVERGED_ITS";
-      case(KSP_DIVERGED_DTOL)		  : return "KSP_DIVERGED_DTOL";
-      case(KSP_DIVERGED_BREAKDOWN)	  : return "KSP_DIVERGED_BREAKDOWN";
-      case(KSP_DIVERGED_BREAKDOWN_BICG)   : return "KSP_DIVERGED_BREAKDOWN_BICG";
-      case(KSP_DIVERGED_NONSYMMETRIC)	  : return "KSP_DIVERGED_NONSYMMETRIC";
-      case(KSP_DIVERGED_INDEFINITE_PC)    : return "KSP_DIVERGED_INDEFINITE_PC";
-      case(KSP_DIVERGED_NANORINF)	  : return "KSP_DIVERGED_NANORINF";
-      case(KSP_DIVERGED_INDEFINITE_MAT)   : return "KSP_DIVERGED_INDEFINITE_MAT";
-      case(KSP_DIVERGED_PCSETUP_FAILED)   : return "KSP_DIVERGED_PCSETUP_FAILED";
-      case(KSP_CONVERGED_ITERATING)	  : return "KSP_CONVERGED_ITERATING";
+      case(KSP_CONVERGED_RTOL_NORMAL    ): return "KSP_CONVERGED_RTOL_NORMAL    ";
+      case(KSP_CONVERGED_ATOL_NORMAL    ): return "KSP_CONVERGED_ATOL_NORMAL    ";
+      case(KSP_CONVERGED_RTOL           ): return "KSP_CONVERGED_RTOL           ";
+      case(KSP_CONVERGED_ATOL           ): return "KSP_CONVERGED_ATOL           ";
+      case(KSP_CONVERGED_ITS            ): return "KSP_CONVERGED_ITS            ";
+      case(KSP_CONVERGED_CG_NEG_CURVE   ): return "KSP_CONVERGED_CG_NEG_CURVE   ";
+      case(KSP_CONVERGED_CG_CONSTRAINED ): return "KSP_CONVERGED_CG_CONSTRAINED ";
+      case(KSP_CONVERGED_STEP_LENGTH    ): return "KSP_CONVERGED_STEP_LENGTH    ";
+      case(KSP_CONVERGED_HAPPY_BREAKDOWN): return "KSP_CONVERGED_HAPPY_BREAKDOWN";
+      case(KSP_DIVERGED_NULL            ): return "KSP_DIVERGED_NULL            ";
+      case(KSP_DIVERGED_ITS             ): return "KSP_DIVERGED_ITS             ";
+      case(KSP_DIVERGED_DTOL            ): return "KSP_DIVERGED_DTOL            ";
+      case(KSP_DIVERGED_BREAKDOWN       ): return "KSP_DIVERGED_BREAKDOWN       ";
+      case(KSP_DIVERGED_BREAKDOWN_BICG  ): return "KSP_DIVERGED_BREAKDOWN_BICG  ";
+      case(KSP_DIVERGED_NONSYMMETRIC    ): return "KSP_DIVERGED_NONSYMMETRIC    ";
+      case(KSP_DIVERGED_INDEFINITE_PC   ): return "KSP_DIVERGED_INDEFINITE_PC   ";
+      case(KSP_DIVERGED_NANORINF        ): return "KSP_DIVERGED_NANORINF        ";
+      case(KSP_DIVERGED_INDEFINITE_MAT  ): return "KSP_DIVERGED_INDEFINITE_MAT  ";
+      case(KSP_DIVERGED_PC_FAILED       ): return "KSP_DIVERGED_PC_FAILED       ";
+      case(KSP_CONVERGED_ITERATING      ): return "KSP_CONVERGED_ITERATING      ";
       default:  return "unknown reason??";
       }
   }
+
 
 
 
@@ -105,7 +105,7 @@ namespace ngs_petsc_interface
       return v;
     };
     // ngsolve -> petsc
-    void NGs2PETSc (shared_ptr<ngs::BaseVector> ngs_vec, ::Vec petsc_vec)
+    void Ngs2PETSc (shared_ptr<ngs::BaseVector> ngs_vec, ::Vec petsc_vec)
     {
       ngs_vec->Cumulate();
       VecAssemblyBegin(petsc_vec);
@@ -116,7 +116,7 @@ namespace ngs_petsc_interface
       VecAssemblyEnd(petsc_vec);
     }
     // petsc -> ngsolve
-    void PETSc2NGs (shared_ptr<ngs::BaseVector> ngs_vec, ::Vec petsc_vec)
+    void PETSc2Ngs (shared_ptr<ngs::BaseVector> ngs_vec, ::Vec petsc_vec)
     {
       ngs_vec->Distribute();
       VecGetValues(petsc_vec, loc, &glob_nums[0], &buf[0]);
