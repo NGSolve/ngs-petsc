@@ -105,7 +105,7 @@ namespace ngs_petsc_interface
       return v;
     };
     // ngsolve -> petsc
-    void N2P (shared_ptr<ngs::BaseVector> ngs_vec, ::Vec petsc_vec)
+    void NGs2PETSc (shared_ptr<ngs::BaseVector> ngs_vec, ::Vec petsc_vec)
     {
       ngs_vec->Cumulate();
       VecAssemblyBegin(petsc_vec);
@@ -116,7 +116,7 @@ namespace ngs_petsc_interface
       VecAssemblyEnd(petsc_vec);
     }
     // petsc -> ngsolve
-    void P2N (shared_ptr<ngs::BaseVector> ngs_vec, ::Vec petsc_vec)
+    void PETSc2NGs (shared_ptr<ngs::BaseVector> ngs_vec, ::Vec petsc_vec)
     {
       ngs_vec->Distribute();
       VecGetValues(petsc_vec, loc, &glob_nums[0], &buf[0]);
@@ -280,7 +280,7 @@ namespace ngs_petsc_interface
     Ngs2PETScVecMap row_map (bs, mat->GetParallelDofs(), fds, row_low, row_high, glob_nr);
     Ngs2PETScVecMap &col_map(row_map);
     ::Vec petsc_rhs = row_map.CreatePETScVec(), petsc_sol = col_map.CreatePETScVec();
-    row_map.N2P(rhs, petsc_rhs);
+    row_map.Ngs2PETSc(rhs, petsc_rhs);
 
     if (kvecs.Size()) 
       {
@@ -288,7 +288,7 @@ namespace ngs_petsc_interface
   	Array<::Vec> petsc_kvecs(dimK);
   	for (auto k : Range(dimK)) {
   	  petsc_kvecs[k] = col_map.CreatePETScVec();
-  	  row_map.N2P(kvecs[k], petsc_kvecs[k]);
+  	  row_map.Ngs2PETSc(kvecs[k], petsc_kvecs[k]);
   	}
   	Array<double> dots(dimK);
   	VecNormalize(petsc_kvecs[0],NULL);
@@ -330,7 +330,7 @@ namespace ngs_petsc_interface
       KSPSolve(ksp, petsc_rhs, petsc_sol);
     }
 
-    col_map.P2N(sol, petsc_sol);
+    col_map.PETSc2Ngs(sol, petsc_sol);
 
     
     auto results = py::dict();
