@@ -23,9 +23,22 @@ namespace petsc_if
       case(KSP_CONVERGED_CG_CONSTRAINED)  : return "KSP_CONVERGED_CG_CONSTRAINED";
       case(KSP_CONVERGED_STEP_LENGTH)     : return "KSP_CONVERGED_STEP_LENGTH";
       case(KSP_CONVERGED_HAPPY_BREAKDOWN) : return "KSP_CONVERGED_HAPPY_BREAKDOWN";
-      default: return "not converged";
+      case(KSP_DIVERGED_NULL)             : return "KSP_DIVERGED_NULL";
+      case(KSP_DIVERGED_ITS)		  : return "KSP_DIVERGED_ITS";
+      case(KSP_DIVERGED_DTOL)		  : return "KSP_DIVERGED_DTOL";
+      case(KSP_DIVERGED_BREAKDOWN)	  : return "KSP_DIVERGED_BREAKDOWN";
+      case(KSP_DIVERGED_BREAKDOWN_BICG)   : return "KSP_DIVERGED_BREAKDOWN_BICG";
+      case(KSP_DIVERGED_NONSYMMETRIC)	  : return "KSP_DIVERGED_NONSYMMETRIC";
+      case(KSP_DIVERGED_INDEFINITE_PC)    : return "KSP_DIVERGED_INDEFINITE_PC";
+      case(KSP_DIVERGED_NANORINF)	  : return "KSP_DIVERGED_NANORINF";
+      case(KSP_DIVERGED_INDEFINITE_MAT)   : return "KSP_DIVERGED_INDEFINITE_MAT";
+      case(KSP_DIVERGED_PCSETUP_FAILED)   : return "KSP_DIVERGED_PCSETUP_FAILED";
+      case(KSP_CONVERGED_ITERATING)	  : return "KSP_CONVERGED_ITERATING";
+      default:  return "unknown reason??";
       }
   }
+
+
 
   void InitializePETSc (FlatArray<string> options)
   {
