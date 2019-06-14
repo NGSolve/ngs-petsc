@@ -155,7 +155,7 @@ namespace ngs_petsc_interface
     auto count_ssm = [&](auto & pardofs, auto & subset) -> PetscInt {
       PetscInt x = 0;
       for (auto k : Range(pardofs->GetNDofLocal()))
-	if ((!subset || subset->Test(k)) && pardofs->IsMasterDof(k))
+	if (`(!subset || subset->Test(k)) && pardofs->IsMasterDof(k))
 	  { x++; }
       return x;
     };
@@ -290,7 +290,6 @@ namespace ngs_petsc_interface
       { row_pardofs = col_pardofs = pc->GetAMatrix().GetParallelDofs(); }
     else // can also be a preconditioner, a ProductMatrix, etc..
       { row_pardofs = col_pardofs = GetNGsMat()->GetParallelDofs(); }
-    cout << "FPM pardofs : " << row_pardofs << " " << col_pardofs << endl;
     auto comm = row_pardofs->GetCommunicator();
 
     // Vector conversions
