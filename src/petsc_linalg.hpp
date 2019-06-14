@@ -21,7 +21,7 @@ namespace ngs_petsc_interface
 
     PETScVec CreatePETScVector () const;
     shared_ptr<ngs::BaseVector> CreateNGsVector () const;
-    
+
   protected:
     shared_ptr<ngs::ParallelDofs> pardofs;
     shared_ptr<ngs::BitArray> subset;
@@ -52,6 +52,9 @@ namespace ngs_petsc_interface
     virtual INLINE shared_ptr<ngs::BaseMatrix> GetNGsMat () const { return ngs_mat; }
     virtual INLINE shared_ptr<ngs::BitArray> GetRowSubSet () const { return row_subset; }
     virtual INLINE shared_ptr<ngs::BitArray> GetColSubSet () const { return col_subset; }
+
+    void SetNullSpace (MatNullSpace null_space);
+    void SetNearNullSpace (MatNullSpace null_space);
 
     virtual int VHeight () const override { return GetNGsMat()->VHeight(); }
     virtual int VWidth () const override { return GetNGsMat()->VWidth(); }
@@ -104,6 +107,10 @@ namespace ngs_petsc_interface
     static PetscErrorCode MatMult (PETScMat A, PETScVec x, PETScVec y);
     shared_ptr<ngs::BaseVector> row_hvec, col_hvec;
   };
+
+
+  MatNullSpace NullSpaceCreate (FlatArray<shared_ptr<ngs::BaseVector>> vecs, shared_ptr<NGs2PETScVecMap> map,
+				bool is_orthonormal = false, bool const_kernel = false);
   
 } // namespace ngs_petsc_interface
 

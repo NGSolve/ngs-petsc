@@ -154,6 +154,7 @@ namespace ngs_petsc_interface
 	   py::arg("mat"), py::arg("name") = string(""), py::arg("finalize") = true,
 	   py::arg("petsc_options") = py::dict()
 	   )
+      .def("GetMatrix", [](shared_ptr<PETScKSP> & ksp) { return ksp->GetMatrix(); } )
       .def("SetPC", [](shared_ptr<PETScKSP> & aksp, shared_ptr<PETScPreconditioner> & apc) {
 	  aksp->SetPC(apc);
 	})

@@ -120,6 +120,17 @@ namespace ngs_petsc_interface
   } // CreatePETScMatSeq
 
 
+  void PETScBaseMatrix :: SetNullSpace (MatNullSpace null_space)
+  {
+    MatSetNullSpace(GetPETScMat(), null_space);
+  }
+
+  void PETScBaseMatrix :: SetNearNullSpace (MatNullSpace null_space)
+  {
+    MatSetNearNullSpace(GetPETScMat(), null_space);
+  }
+
+
   PETScMat CreatePETScMatIS (PETScMat petsc_mat_loc,
 			     shared_ptr<ngs::ParallelDofs> row_pardofs,
 			     shared_ptr<ngs::ParallelDofs> col_pardofs,
@@ -155,7 +166,7 @@ namespace ngs_petsc_interface
     auto count_ssm = [&](auto & pardofs, auto & subset) -> PetscInt {
       PetscInt x = 0;
       for (auto k : Range(pardofs->GetNDofLocal()))
-	if (`(!subset || subset->Test(k)) && pardofs->IsMasterDof(k))
+	if ((!subset || subset->Test(k)) && pardofs->IsMasterDof(k))
 	  { x++; }
       return x;
     };
@@ -292,6 +303,8 @@ namespace ngs_petsc_interface
       { row_pardofs = col_pardofs = GetNGsMat()->GetParallelDofs(); }
     auto comm = row_pardofs->GetCommunicator();
 
+    int bs = row_pardofs->GetNDofLocal();
+
     // Vector conversions
     row_map = make_shared<NGs2PETScVecMap>(row_pardofs, row_subset);
     col_map = make_shared<NGs2PETScVecMap>(col_pardofs, col_subset);
@@ -305,7 +318,7 @@ namespace ngs_petsc_interface
     size_t nrows_loc = 0, ncols_loc = 0;
     for (auto k : Range(row_pardofs->GetNDofLocal()))
       if (row_pardofs->IsMasterDof(k) && (!_row_subset || _row_subset->Test(k)) )
-	{ nrows_loc++; }
+	{ nrows_loc += bs; }
     size_t nrows_glob = comm.AllReduce(nrows_loc, MPI_SUM), ncols_glob = 0;
     if (row_pardofs == col_pardofs)
       {
@@ -315,7 +328,7 @@ namespace ngs_petsc_interface
     else {
       for (auto k : Range(col_pardofs->GetNDofLocal()))
 	if (col_pardofs->IsMasterDof(k) && (!_col_subset || _col_subset->Test(k)) )
-	  { ncols_loc++; }
+	  { ncols_loc += bs; }
       ncols_glob = comm.AllReduce(ncols_loc, MPI_SUM);
     }
     MatCreateShell (comm, nrows_loc, ncols_loc, nrows_glob, ncols_glob, (void*) this, &petsc_mat);
@@ -346,11 +359,44 @@ namespace ngs_petsc_interface
   } // FlatPETScMatrix::MatMult
 
 
+  MatNullSpace NullSpaceCreate (FlatArray<shared_ptr<ngs::BaseVector>> vecs, shared_ptr<NGs2PETScVecMap> map,
+				bool is_orthonormal, bool const_kernel)
+  {
+    Array<PETScVec> petsc_vecs(vecs.Size());
+    for (auto k : Range(vecs.Size())) {
+      petsc_vecs[k] = map->CreatePETScVector();
+      map->NGs2PETSc(*vecs[k], petsc_vecs[k]);
+    }
+    Array<double> dots(vecs.Size());
+    if (!is_orthonormal) {
+      VecNormalize(petsc_vecs[0],NULL);
+      for (int i = 1; i < vecs.Size(); i++) {
+	VecMDot(petsc_vecs[i],i,&petsc_vecs[0],&dots[0]);
+	for (int j = 0; j < i; j++) dots[j] *= -1.;
+	VecMAXPY(petsc_vecs[i],i,&dots[0],&petsc_vecs[0]);
+	VecNormalize(petsc_vecs[i],NULL);
+      }
+    }
+    MatNullSpace ns; MatNullSpaceCreate(map->GetParallelDofs()->GetCommunicator(), const_kernel ? PETSC_TRUE : PETSC_FALSE, vecs.Size(), &petsc_vecs[0], &ns);
+    for (auto v : petsc_vecs) // destroy vecs (reduces reference count by 1)
+      { VecDestroy(&v); }
+    return ns;
+  } // NullSpaceCreate
+
+
   void ExportLinAlg (py::module &m)
   {
 
     py::class_<PETScBaseMatrix, shared_ptr<PETScBaseMatrix>, ngs::BaseMatrix>
-      (m, "PETScBaseMatrix", "Can be used as an NGSolve- or as a PETSc- Matrix");
+      (m, "PETScBaseMatrix", "Can be used as an NGSolve- or as a PETSc- Matrix")
+      .def("SetNullSpace", [](shared_ptr<PETScBaseMatrix> & mat, py::list py_kvecs) {
+	  Array<shared_ptr<ngs::BaseVector>> kvecs = makeCArraySharedPtr<shared_ptr<ngs::BaseVector>>(py_kvecs);
+	  mat->SetNullSpace(NullSpaceCreate(kvecs, mat->GetRowMap()));
+	}, py::arg("kvecs"))
+      .def("SetNearNullSpace", [](shared_ptr<PETScBaseMatrix> & mat, py::list py_kvecs) {
+	  Array<shared_ptr<ngs::BaseVector>> kvecs = makeCArraySharedPtr<shared_ptr<ngs::BaseVector>>(py_kvecs);
+	  mat->SetNearNullSpace(NullSpaceCreate(kvecs, mat->GetRowMap()));
+	}, py::arg("kvecs"));
     
 
     py::class_<PETScMatrix, shared_ptr<PETScMatrix>, PETScBaseMatrix>
