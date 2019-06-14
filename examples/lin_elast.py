@@ -147,7 +147,7 @@ def setup_rots(mesh, comp=True):
         gradut = CoefficientFunction((grad(V)[0,0],grad(V)[0,1],grad(V)[1,0],grad(V)[1,1]), dims=[2,2])
     wmat = CoefficientFunction( (0, w, -w, 0), dims = (2,2) )
     wtmat = CoefficientFunction( (0, wt, -wt, 0), dims = (2,2) )
-    factor = {"fiber":1e4, "mat":1, "default":1}
+    factor = {"fiber":1e2, "mat":1, "default":1}
     cf_factor = CoefficientFunction( [ factor[mat] for mat in mesh.GetMaterials() ] )
     coef = cf_factor
     force = CoefficientFunction( (0, -0.0002) )
@@ -170,7 +170,7 @@ def setup_norots(mesh, comp=True):
     epsu = 0.5 * (gradu + gradu.trans)
     gradv = grad(v)
     epsv = 0.5 * (gradv + gradv.trans)
-    factor = {"fiber":1e4, "mat":1, "default":1}
+    factor = {"fiber":1e2, "mat":1, "default":1}
     cf_factor = CoefficientFunction( [ factor[mat] for mat in mesh.GetMaterials() ] )
     coef = cf_factor
     force = CoefficientFunction( (0, -0.0002) )
@@ -236,8 +236,6 @@ def TestKSP(fes, a, f, tsol, tsup, opts = {}, kvecs=list(), vfac=1):
         nvg = vfac * fes.ndofglobal
         print('KSP setup: ', t_ksp_sup)
         print('KSP solve nV/(t*NP): ', nvg/(t_ksp_sup*comm.size))
-        print('KSP solve: ', t_ksp_sol)
-        print('KSP solve nV/(t*NP): ', nvg/(t_ksp_sol*comm.size))
     res = f.vec.CreateVector()
     p_res = f.vec.CreateVector()
     res.data = f.vec
@@ -296,16 +294,21 @@ if __name__=='__main__':
     hypre_opts = lambda C,R,K : {"pc_type" : "hypre", "pc_hypre_type" : "boomeramg",
                                  "pc_hypre_boomeramg_nodal_coarsen" : 3,
                                  "pc_hypre_boomeramg_vec_interp_variant" : 3}
-    hypre_tests = lambda C,R,K : not C 
+    hypre_tests = lambda C,R,K : not C and not R and K
+
+
+    ml_opts = lambda C,R,K : {"pc_type" : "ml", "pc_ml_repartition":"true"}
+    ml_tests = lambda C,R,K : not R and K
+
     
     ngsglobals.msg_level = 1
     comm = MPI_Init()
     tsol, tsup = 0,0
-    tsol, tsup = test_case(tsol, tsup, title = "BEAM", mesh_func = lambda : mesh_beam(0.1),
+    tsol, tsup = test_case(tsol, tsup, title = "BEAM", mesh_func = lambda : mesh_beam(0.01),
                            do_test = hypre_tests, ksp_opts = hypre_opts)
-    tsol, tsup = test_case(tsol, tsup, title = "STRIP", mesh_func = lambda : mesh_strip(int(1e2)), # 1x100 strip
-                           do_test = hypre_tests, ksp_opts = hypre_opts)
-    tsol, tsup = test_case(tsol, tsup, title = "FIBER", mesh_func = lambda : mesh_fiber(15), # 15 fibers
-                           do_test = hypre_tests, ksp_opts = hypre_opts)
+#    tsol, tsup = test_case(tsol, tsup, title = "STRIP", mesh_func = lambda : mesh_strip(int(1e2)), # 1x100 strip
+#                           do_test = hypre_tests, ksp_opts = hypre_opts)
+#    tsol, tsup = test_case(tsol, tsup, title = "FIBER", mesh_func = lambda : mesh_fiber(15), # 15 fibers
+#                           do_test = hypre_tests, ksp_opts = hypre_opts)
 
     

@@ -1,12 +1,13 @@
-project(ngspetsc)
+project(libpetscinterface)
 
 cmake_minimum_required(VERSION 3.8)
 
-add_ngsolve_python_module(ngspetsc SHARED petsc_interface.cpp)
+add_ngsolve_python_module(libpetscinterface SHARED
+    python_ngspetsc.cpp utils.cpp petsc_linalg.cpp petsc_ksp.cpp petsc_pc.cpp)
 
 include_directories(${PETSC_INCLUDES})
 
-target_link_libraries(ngspetsc ${PETSC_LIBRARIES})
-target_include_directories(ngspetsc PRIVATE ${PETSC_INCLUDES})
+target_link_libraries(libpetscinterface ${PETSC_LIBRARIES})
+target_include_directories(libpetscinterface PRIVATE ${PETSC_INCLUDES})
 
-install(TARGETS ngspetsc DESTINATION ${CMAKE_INSTALL_PREFIX})
+install(TARGETS libpetscinterface DESTINATION ${CMAKE_INSTALL_PREFIX}/ngs_petsc)

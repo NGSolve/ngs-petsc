@@ -271,10 +271,12 @@ namespace ngs_petsc_interface
     MatAssemblyBegin(petsc_mat, MAT_FINAL_ASSEMBLY);
     MatAssemblyEnd(petsc_mat, MAT_FINAL_ASSEMBLY);
     
+    // MatConvert(petsc_mat, MATMPIAIJ, MAT_INPLACE_MATRIX, &petsc_mat);
+    // MatConvert(petsc_mat, MATMPIBAIJ, MAT_INPLACE_MATRIX, &petsc_mat);
     MatConvert(petsc_mat, MATMPIAIJ, MAT_INPLACE_MATRIX, &petsc_mat);
-    if(bs!=1) MatSetBlockSize(petsc_mat, bs);
     // MatConvert(petsc_mat, (bs!=1) ? MATMPIBAIJ : MPIAIJ, MAT_INPLACE_MATRIX, &petsc_mat); //doesnt work with GAMG?
-
+    if(bs!=1) MatSetBlockSize(petsc_mat, bs);
+    
     PetscInt row_low, row_high;
     MatGetOwnershipRange(petsc_mat, &row_low, &row_high);
     PetscInt glob_nr, glob_nc;
@@ -286,10 +288,12 @@ namespace ngs_petsc_interface
     ::Vec petsc_rhs = row_map.CreatePETScVec(), petsc_sol = col_map.CreatePETScVec();
     row_map.Ngs2PETSc(rhs, petsc_rhs);
 
+    MatNullSpace petsc_null_space;
+    Array<::Vec> petsc_kvecs;
     if (kvecs.Size()) 
       {
   	int dimK = kvecs.Size();
-  	Array<::Vec> petsc_kvecs(dimK);
+	petsc_kvecs.SetSize(dimK);
   	for (auto k : Range(dimK)) {
   	  petsc_kvecs[k] = col_map.CreatePETScVec();
   	  row_map.Ngs2PETSc(kvecs[k], petsc_kvecs[k]);
@@ -303,9 +307,9 @@ namespace ngs_petsc_interface
   	  VecMAXPY(petsc_kvecs[i],i,&dots[0],&petsc_kvecs[0]);
   	  VecNormalize(petsc_kvecs[i],NULL);
   	}
-  	MatNullSpace petsc_null_space;
   	MatNullSpaceCreate(comm, PETSC_FALSE, dimK, &petsc_kvecs[0], &petsc_null_space);
   	MatSetNearNullSpace(petsc_mat, petsc_null_space);
+  	// MatSetNullSpace(petsc_mat, petsc_null_space);
       }    
     
     
@@ -313,6 +317,8 @@ namespace ngs_petsc_interface
     KSPCreate(comm, &ksp);
     KSPSetOperators(ksp, petsc_mat, petsc_mat); //system-mat, mat for PC
     KSPSetFromOptions(ksp);
+    // if (kvecs.Size()) 
+    //   KSPSetNullSpace(ksp, petsc_null_space);
 
     {
       ngs::RegionTimer rt(t_sup);
@@ -339,8 +345,6 @@ namespace ngs_petsc_interface
     
     auto results = py::dict();
     {
-      auto add_entry = [&](auto name, const py::object & o)
-	{ results[name] = o; };
       KSPConvergedReason conv_r; KSPGetConvergedReason(ksp, &conv_r);
       results["conv_r"] = py::str(name_reason(conv_r));
       PetscInt nits; KSPGetIterationNumber(ksp, &nits);
