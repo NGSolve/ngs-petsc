@@ -44,9 +44,7 @@ namespace ngs_petsc_interface
   // class P2N_Precond : public PETScPreconditioner
   // {
   // public:
-
   //   P2N_Precond (PETScMat petsc_mat, string name, Array<string> options);
-
   // protected:
   // };
 

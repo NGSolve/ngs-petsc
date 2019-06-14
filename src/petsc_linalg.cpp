@@ -13,7 +13,7 @@ namespace ngs_petsc_interface
 
     static_assert(ngs::mat_traits<TM>::WIDTH == ngs::mat_traits<TM>::HEIGHT, "PETSc can only handle square block entries!");
 
-    // row map
+    // row map (map for a row)
     PetscInt bw = ngs::mat_traits<TM>::WIDTH;
     int nbrow = 0;
     Array<int> row_compress(spmat->Width());
@@ -21,8 +21,8 @@ namespace ngs_petsc_interface
       { row_compress[k] = (!rss || rss->Test(k)) ? nbrow++ : -1; }
     int ncols = nbrow * bw;
     
-    // col map
-    PetscInt bh = ngs::mat_traits<TM>::WIDTH;
+    // col map (map for a col)
+    PetscInt bh = ngs::mat_traits<TM>::HEIGHT;
     int nbcol = 0;
     Array<int> col_compress(spmat->Height());
     for (auto k : Range(spmat->Height()))
@@ -138,7 +138,7 @@ namespace ngs_petsc_interface
       Array<PetscInt> compress_globnums(subset ? subset->NumSet() : pardofs->GetNDofLocal());
       PetscInt loc_nfd = 0; // map needs number of local FREE dofs
       for (auto k : Range(pardofs->GetNDofLocal()))
-	if(globnums[k]!=-1)
+	if (globnums[k]!=-1)
 	  compress_globnums[loc_nfd++] = globnums[k];
       int loc_nfr = loc_nfd * bs;
       ISLocalToGlobalMapping map;
@@ -155,7 +155,7 @@ namespace ngs_petsc_interface
     auto count_ssm = [&](auto & pardofs, auto & subset) -> PetscInt {
       PetscInt x = 0;
       for (auto k : Range(pardofs->GetNDofLocal()))
-	if((!subset || subset->Test(k)) && pardofs->IsMasterDof(k))
+	if ((!subset || subset->Test(k)) && pardofs->IsMasterDof(k))
 	  { x++; }
       return x;
     };
