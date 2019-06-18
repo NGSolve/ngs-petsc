@@ -3,7 +3,8 @@ project(libpetscinterface)
 cmake_minimum_required(VERSION 3.8)
 
 add_ngsolve_python_module(libpetscinterface SHARED
-    python_ngspetsc.cpp utils.cpp petsc_linalg.cpp petsc_ksp.cpp petsc_pc.cpp)
+    python_ngspetsc.cpp utils.cpp petsc_linalg.cpp petsc_pc.cpp
+    petsc_ksp.cpp petsc_snes.cpp)
 
 include_directories(${PETSC_INCLUDES})
 
