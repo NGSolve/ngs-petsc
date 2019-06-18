@@ -27,7 +27,8 @@ E, nu = 210, 0.2
 mu  = E / 2 / (1+nu)
 lam = E * nu / ((1+nu)*(1-2*nu))
 
-V = H1(mesh, order=1, dirichlet="left", dim=mesh.dim)
+#V = H1(mesh, order=1, dirichlet="left", dim=mesh.dim)
+V = VectorH1(mesh, order=1, dirichlet="left")
 u  = V.TrialFunction()
 
 #gravity:
@@ -58,20 +59,20 @@ poo = dict()
 #poo = {"info" : ""}
 petsc.Initialize(**poo)
 
-petsc_options = {"ksp_pc_type" : "none",
+petsc_options = {"pc_type" : "none",
                  "ksp_type" : "cg",
                  "ksp_atol" : 1e-30,
                  "ksp_rtol" : 1e-8,
                  "ksp_max_it" : 1000,
+                 #"ksp_view" : "",
                  #"ksp_monitor" : "",
-                 #"info" : "",
                  #"ksp_converged_reason" : "",
-                 #"snes_monitor" : "",
                  #"snes_view" : "",
-                 "snes_converged_reason" : "",
+                 #"snes_monitor" : "",
+                 #"snes_converged_reason" : "",
                  "snes_max_it" : 50,
                  "snes_linesearch_type" : "basic" }
-snes = petsc.SNES(a, name="mysnes", petsc_options=petsc_options)
+snes = petsc.SNES(a, name="mysnes", petsc_options=petsc_options, mode = petsc.SNES.JACOBI_MAT_MODE.CONVERT)
 snes_ksp = snes.GetKSP()
 
 res1 = gfu.vec.CreateVector()
@@ -110,7 +111,7 @@ import sys
 Draw (mesh, deformation=gfu,  name="u - ptc")
 Draw (mesh, deformation=gfu2, name="u - ngs")
 ngsglobals.msg_level = 0
-for loadstep in range(50):
+for loadstep in range(1):
     print ("Solve loadstep", loadstep)
     sys.stdout.flush()
     factor.Set ((loadstep+1)/10)
@@ -138,13 +139,13 @@ for loadstep in range(50):
     Redraw()
 
     ksp_res = snes_ksp.results
-    # if comm.rank==0:
+    if comm.rank==0:
     #     # print(' ----- ')
     #     # for k,v in ksp_res.items():
     #     #     print(k, v)
     #     print(' ----- ')
     #     print('ndof ', V.ndofglobal)
-    #     print(' pc used: ', ksp_res['pc_used'])
+        print(' pc used: ', ksp_res['pc_used'])
     #     print('ksp converged? ', ksp_res['conv_r'])
     #     print('PETSc took nits:', ksp_res['nits'])
     #     print('init. norm res: ', ksp_res['errs'][0])

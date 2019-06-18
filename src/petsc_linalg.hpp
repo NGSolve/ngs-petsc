@@ -7,15 +7,24 @@
 
 namespace ngs_petsc_interface
 {
-  /** Can convert between NGSolve- and PETSc vectors **/
+  /** 
+      Can convert between NGSolve- and PETSc vectors
+      If _build_maps == true, stores the DOF-mapping explicitely
+  **/
   class NGs2PETScVecMap
   {
   public:
 
     /** we have to give ndof and bs explicitely, because pardofs and subset can be nullptrs (not parallel / no Dirichlet BC)**/
-    NGs2PETScVecMap (size_t _ndof, int _bs, shared_ptr<ngs::ParallelDofs> _pardofs, shared_ptr<ngs::BitArray> _subset);
+    NGs2PETScVecMap (size_t _ndof, int _bs, shared_ptr<ngs::ParallelDofs> _pardofs,
+		     shared_ptr<ngs::BitArray> _subset);
     
+    ~NGs2PETScVecMap ();
+
+    int GetBS () const { return bs; }
+    INLINE bool IsParallel () const { return pardofs != nullptr; }
     shared_ptr<ngs::ParallelDofs> GetParallelDofs () const { return pardofs; }
+    shared_ptr<ngs::BitArray> GetSubSet () const { return subset; }
 
     void NGs2PETSc (ngs::BaseVector& ngs_vec, PETScVec petsc_vec);
     void PETSc2NGs (ngs::BaseVector& ngs_vec, PETScVec petsc_vec);
@@ -23,10 +32,11 @@ namespace ngs_petsc_interface
     size_t GetNRowsLocal  () const { return nrows_loc; }
     size_t GetNRowsGlobal () const { return nrows_glob; }
 
+    FlatArray<PetscInt> GetDOFMap () const { return dof_map; }
+    ISLocalToGlobalMapping GetISMap () const;
+
     PETScVec CreatePETScVector () const;
     shared_ptr<ngs::BaseVector> CreateNGsVector () const;
-
-    shared_ptr<ngs::BitArray> GetSubSet () const { return subset; }
 
   protected:
     size_t ndof;
@@ -34,6 +44,8 @@ namespace ngs_petsc_interface
     shared_ptr<ngs::ParallelDofs> pardofs;
     shared_ptr<ngs::BitArray> subset;
     size_t nrows_loc, nrows_glob;
+    Array<PetscInt> dof_map;         // maps ALL DOFS (not rows!) to global nums, non-subset get -1
+    ISLocalToGlobalMapping is_map;   // maps MASTER + SUBSET DOFS (not rows!) to global nums (only constructed if parallel)
   };
 
   /** Ports an NGSolve-BaseMatrix to PETSc **/
@@ -96,7 +108,12 @@ namespace ngs_petsc_interface
   {
   public:
     PETScMatrix (shared_ptr<ngs::BaseMatrix> _ngs_mat, shared_ptr<ngs::BitArray> _row_subset,
-		 shared_ptr<ngs::BitArray> _col_subset, PETScMatType _petsc_mat_type = MATMPIAIJ);
+		 shared_ptr<ngs::BitArray> _col_subset, shared_ptr<NGs2PETScVecMap> _row_map = nullptr,
+		 shared_ptr<NGs2PETScVecMap> _col_map = nullptr);
+
+    PETScMatrix (shared_ptr<ngs::BaseMatrix> _ngs_mat, shared_ptr<ngs::BitArray> _row_subset,
+		 shared_ptr<ngs::BitArray> _col_subset, PETScMatType _petsc_mat_type,
+		 shared_ptr<NGs2PETScVecMap> _row_map = nullptr, shared_ptr<NGs2PETScVecMap> _col_map = nullptr);
 
     virtual void UpdateValues ();
   };

@@ -24,12 +24,16 @@ namespace ngs_petsc_interface
     default : return "weird, unknown reason";
     }
   }
-  
+
 
   PETScSNES :: PETScSNES (shared_ptr<ngs::BilinearForm> _blf, FlatArray<string> _opts, string _name,
-			  shared_ptr<ngs::LocalHeap> alh)
-    : blf(_blf), use_lh(alh)
+			  shared_ptr<ngs::LocalHeap> _lh, JACOBI_MAT_MODE _jac_mode)
+    : blf(_blf), use_lh(_lh), mode(_jac_mode)
   {
+
+    if (use_lh == nullptr)
+      { use_lh = make_shared<ngs::LocalHeap>(10*1024*1024); }
+
     auto pardofs = blf->GetTrialSpace()->GetParallelDofs();
     MPI_Comm comm;
     if (pardofs != nullptr)
@@ -40,36 +44,41 @@ namespace ngs_petsc_interface
     auto row_fds = blf->GetTrialSpace()->GetFreeDofs();
     auto col_fds = blf->GetTestSpace()->GetFreeDofs();
 
-    // assemble matrix once so it is allocated
-    row_vec = blf->CreateRowVector(); *row_vec = 0;
-    blf->AssembleLinearization (*row_vec, *use_lh, false);
+    // linearization vector
+    lin_vec = blf->CreateRowVector();
 
-    cout << "MAT SIZE: " << blf->GetMatrixPtr()->Height() << " x " << blf->GetMatrixPtr()->Width() << endl;
-    
     // Create Matrix for F'(x)
     // jac_mat = make_shared<FlatPETScMatrix> (blf->GetMatrixPtr(), row_fds, col_fds);
 
-    auto trans_mat = make_shared<ngs::Transpose>(blf->GetMatrixPtr());
-    trans_mat->SetParallelDofs(blf->GetMatrixPtr()->GetParallelDofs());
-    jac_mat = make_shared<FlatPETScMatrix> (trans_mat, row_fds, col_fds);
+    // auto trans_mat = make_shared<ngs::Transpose>(blf->GetMatrixPtr());
+    // trans_mat->SetParallelDofs(blf->GetMatrixPtr()->GetParallelDofs());
+    // jac_mat = make_shared<FlatPETScMatrix> (trans_mat, row_fds, col_fds);
 
-    // jac_mat = make_shared<FlatPETScMatrix> (blf->GetMatrixPtr(), row_fds, col_fds);
+    // Vector maps
+    auto trs = blf->GetTrialSpace();
+    auto row_map = make_shared<NGs2PETScVecMap>(trs->GetNDof(), trs->GetDimension(), trs->GetParallelDofs(), trs->GetFreeDofs());
+    auto tss = blf->GetTrialSpace();
+    auto col_map = make_shared<NGs2PETScVecMap>(tss->GetNDof(), tss->GetDimension(), tss->GetParallelDofs(), tss->GetFreeDofs());
 
-    // jac_mat = make_shared<PETScMatrix> (blf->GetMatrixPtr(), row_fds, col_fds, MATMPIBAIJ);
-
-    // auto width = row_fds->Size();
-    // Array<int> perow(width); perow = 1;
-    // auto idmat = make_shared<ngs::SparseMatrix<Mat<2>>>(perow);
-    // for(auto k : Range(width))
-    //   { auto & d = (*idmat)(k,k); d(0,0) = d(1,1) = 1; }
-    // jac_mat = make_shared<FlatPETScMatrix> (idmat, row_fds, col_fds);
+    if (mode == APPLY) {
+      auto lap = make_shared<ngs::LinearizedBilinearFormApplication>(blf, lin_vec.get(), *use_lh);
+      jac_mat = make_shared<FlatPETScMatrix> (lap, nullptr, nullptr, row_map, col_map);
+    }
+    else {
+      // assemble matrix once so it is allocated
+      *lin_vec = 0;
+      blf->AssembleLinearization (*lin_vec, *use_lh, false);
+      if (mode == FLAT)
+	{ jac_mat = make_shared<FlatPETScMatrix> (blf->GetMatrixPtr(), row_fds, col_fds, row_map, col_map); }
+      else if (mode == CONVERT) // IS makes UpdateValues easier
+	{ jac_mat = make_shared<PETScMatrix> (blf->GetMatrixPtr(), row_fds, col_fds, MATMPIAIJ, row_map, col_map); }
+    }
 
     // buffer vectors
+    row_vec = jac_mat->GetRowMap()->CreateNGsVector();
     col_vec = jac_mat->GetColMap()->CreateNGsVector();
     sol_vec = jac_mat->GetRowMap()->CreatePETScVector();
 
-    cout << "SNES" << endl;
-    
     // Create SNES
     SNESCreate(comm, &GetSNES());
 
@@ -78,7 +87,7 @@ namespace ngs_petsc_interface
     ksp = make_shared<PETScKSP> (jac_mat, snes_ksp);
 
     // set prefix so we can define unique options for this SNES object
-    string name = (_name.size()) ? _name : GetDefaultId(); // name += string("_");
+    string name = (_name.size()) ? _name : GetDefaultId();
     SNESSetOptionsPrefix(GetSNES(), name.c_str());
     // KSPSetOptionsPrefix(GetKSP()->GetKSP(), name.c_str());
 
@@ -91,8 +100,6 @@ namespace ngs_petsc_interface
     // Set (non-linear) function evaluation, f = F(x)
     SNESSetFunction(GetSNES(), func_vec, this->EvaluateF, (void*)this);
 
-    // jac_mat2 = make_shared<PETScMatrix> (blf->GetMatrixPtr(), row_fds, col_fds, MATMPIAIJ);
-    
     // Set evaluation of the Jacobian
     SNESSetJacobian(GetSNES(), jac_mat->GetPETScMat(), jac_mat->GetPETScMat(), this->EvaluateJac, (void*)this);
   }
@@ -146,52 +153,11 @@ namespace ngs_petsc_interface
     auto& self = *( (PETScSNES*) ctx);
     HeapReset hr(*self.use_lh);
 
-    // cout << endl << endl << " EVAL F " << endl;
-    
     self.jac_mat->GetRowMap()->PETSc2NGs(*self.row_vec, x);
 
-    // self.row_vec->Cumulate(); // OH FOR FUCKS SAKE WHE DO I NEED TO WHY DO I NEED TO DO THIS, IS EVERYTHING BROKEN WITH MPI??
-    
     self.blf->ApplyMatrix(*self.row_vec, *self.col_vec, *self.use_lh);
 
-    auto pds = self.jac_mat->GetNGsMat()->GetParallelDofs();
-    auto fs = self.jac_mat->GetRowMap()->GetSubSet();
-    
-    // cout << endl << "-------------" << endl;
-    // cout << " ngs - x: " << self.row_vec->GetParallelStatus() << endl;
-    // for (auto k : Range(self.row_vec->FVDouble().Size()))
-    //   {
-    // 	cout << k << ": ";
-    // 	if (pds) cout << "(" << pds->IsMasterDof(k/2) << ") ";
-    // 	cout << "(" << fs->Test(k/2) << ") ";
-    // 	cout << self.row_vec->FVDouble()[k] << endl;
-    //   }
-    // cout << endl << "-------------" << endl;
-
-
-    // cout << endl << "-------------" << endl;
-    // cout << " I ngs - F(x): " << self.col_vec->GetParallelStatus() << endl;
-    // for (auto k : Range(self.col_vec->FVDouble().Size()))
-    //   {
-    // 	cout << k << ": ";
-    // 	if (pds) cout << "(" << pds->IsMasterDof(k/2) << ") ";
-    // 	cout << "(" << fs->Test(k/2) << ") ";
-    // 	cout << self.col_vec->FVDouble()[k] << endl;
-    //   }
-    // cout << endl << "-------------" << endl;
-
     self.jac_mat->GetColMap()->NGs2PETSc(*self.col_vec, f);
-
-    // cout << endl << "-------------" << endl;
-    // cout << " II ngs - F(x): " << self.col_vec->GetParallelStatus() << endl;
-    // for (auto k : Range(self.col_vec->FVDouble().Size()))
-    //   {
-    // 	cout << k << ": ";
-    // 	if (pds) cout << " (" << pds->IsMasterDof(k/2) << ") ";
-    // 	cout << "(" << fs->Test(k/2) << ") ";
-    // 	cout << self.col_vec->FVDouble()[k] << endl;
-    //   }
-    // cout << endl << "-------------" << endl;
 
     // cout << "x: " << x << endl;
     // VecView(x, PETSC_VIEWER_STDOUT_WORLD);
@@ -205,54 +171,22 @@ namespace ngs_petsc_interface
 
   PetscErrorCode PETScSNES :: EvaluateJac (SNES snes, PETScVec x, PETScMat A, PETScMat B, void* ctx)
   {
-
     auto& self = *( (PETScSNES*) ctx);
     HeapReset hr(*self.use_lh);
-
-    // MatAssemblyBegin(A, MAT_FINAL_ASSEMBLY);
-    // MatAssemblyEnd(A, MAT_FINAL_ASSEMBLY);
-    // MatAssemblyBegin(B, MAT_FINAL_ASSEMBLY);
-    // MatAssemblyEnd(B, MAT_FINAL_ASSEMBLY);
     
-    // assert(A == self.jac_mat->GetPETScMatrix(), "A != JAC BUFFER, WTF?");
+    // actually, this happens if snes_mf or snes_mf_operator are set
     // if(A != self.jac_mat->GetPETScMat()) { throw Exception("A != JAC BUFFER, WTF?"); }
-    // assert(B == self.jac_mat->GetPETScMatrix(), "B != JAC BUFFER, WTF?");
     if(B != self.jac_mat->GetPETScMat()) { throw Exception("B != JAC BUFFER, WTF?"); }
-
-    // KSPSetOperators(self.GetKSP()->GetKSP(), A, B);
     
-    auto ksp = self.GetKSP()->GetKSP();
-    PETScPC pc; KSPGetPC(ksp, &pc);
-    PETScMat amat, pmat; PCGetOperators(pc, &amat, &pmat);
-    PetscInt m,n;
-    MatGetSize(amat,&m,&n);
-    MatGetLocalSize(amat,&m,&n);
-    MatGetSize(pmat,&m,&n);
-    MatGetLocalSize(pmat,&m,&n);
-    
-    MatGetSize(self.jac_mat->GetPETScMat(), &m, &n);
-    MatGetLocalSize(self.jac_mat->GetPETScMat(), &m, &n);
-    
-    self.jac_mat->GetRowMap()->PETSc2NGs(*self.row_vec, x);
-
-    // cout << "ASS JAC at " << endl << *self.row_vec << endl;
-
+    self.jac_mat->GetRowMap()->PETSc2NGs(*self.lin_vec, x);
 
     // do not re-allocate matrix !
-    // cout << "1 JM NGSM: " << self.jac_mat->GetNGsMat() << endl;
-    // cout << "1 blf MAT: " << self.blf->GetMatrixPtr() << endl;
-    // cout << "mt type " << typeid(*self.blf->GetMatrixPtr()).name() << endl;
-    // cout << "MAT BEF: " << endl << *self.blf->GetMatrixPtr() << endl;
+    if (self.mode != APPLY)
+      { self.blf->AssembleLinearization (*self.lin_vec, *self.use_lh, false); }
 
-    // self.row_vec->Cumulate(); // OH FOR FUCKS SAKE WHE DO I NEED TO WHY DO I NEED TO DO THIS, IS EVERYTHING BROKEN WITH MPI??
-
-    self.blf->AssembleLinearization (*self.row_vec, *self.use_lh, false);
-    // cout << "2 JM NGSM: " << self.jac_mat->GetNGsMat() << endl;
-    // cout << "2 blf MAT: " << self.blf->GetMatrixPtr() << endl;
-    // cout << "mt type " << typeid(*self.blf->GetMatrixPtr()).name() << endl;
-    // cout << "MAT AFT: " << endl << *self.blf->GetMatrixPtr() << endl;
-
+    cout << "UPDATE VALUES!" << endl;
     self.jac_mat->UpdateValues();
+    cout << "UPDATE VALUES DONE!" << endl;
 
     return PetscErrorCode(0);
   }
@@ -262,19 +196,33 @@ namespace ngs_petsc_interface
   {
     extern Array<string> Dict2SA (py::dict & petsc_options);
 
-    py::class_<PETScSNES, shared_ptr<PETScSNES>>
-      (m, "SNES", "")
-      .def(py::init<>
-      	   ([&] (shared_ptr<ngs::BilinearForm> blf, string name, bool finalize, py::dict petsc_options) {
-      	     auto opt_array = Dict2SA(petsc_options);
-      	     auto snes = make_shared<PETScSNES>(blf, opt_array, name, make_shared<LocalHeap>(10*1024*1024));
-      	     if (finalize)
-      	       { snes->Finalize(); }
-      	     return snes;
-      	   }),
-      	   py::arg("blf"), py::arg("name") = string(""), py::arg("finalize") = true,
-      	   py::arg("petsc_options") = py::dict()
-      	   )
+    auto snes = py::class_<PETScSNES, shared_ptr<PETScSNES>>
+      (m, "SNES", "");
+
+    py::enum_<PETScSNES::JACOBI_MAT_MODE>
+      (snes, "JACOBI_MAT_MODE", docu_string(R"raw_string(
+How the jacobi matrix should be implemented:
+APPLY   ... Do not assemble jacobi mat (use ApplyLinearization)
+FLAT    ... Assemble Jacobi matrix, but only wrap it to PETSc
+CONVERT ... Assemble Jacobi matrix, and convert it to a PETSc matrix)raw_string"))
+      .value("APPLY"  , PETScSNES::JACOBI_MAT_MODE::APPLY)
+      .value("FLAT"   , PETScSNES::JACOBI_MAT_MODE::FLAT)
+      .value("CONVERT", PETScSNES::JACOBI_MAT_MODE::CONVERT)
+      .export_values()
+      ;
+
+    snes.def(py::init<>
+	     ([&] (shared_ptr<ngs::BilinearForm> blf, string name, bool finalize,
+		   PETScSNES::JACOBI_MAT_MODE mode, py::dict petsc_options) {
+	       auto opt_array = Dict2SA(petsc_options);
+	       auto snes = make_shared<PETScSNES>(blf, opt_array, name, make_shared<LocalHeap>(10*1024*1024), mode);
+	       if (finalize)
+		 { snes->Finalize(); }
+	       return snes;
+	     }),
+	     py::arg("blf"), py::arg("name") = string(""), py::arg("finalize") = true,
+	     py::arg("mode") = PETScSNES::JACOBI_MAT_MODE::FLAT, py::arg("petsc_options") = py::dict()
+	     )
       .def("Finalize", [](shared_ptr<PETScSNES> & snes) { snes->Finalize(); })
       .def("Solve", [](shared_ptr<PETScSNES> & snes, shared_ptr<ngs::BaseVector> sol) {
 	  snes->Solve(*sol);
@@ -282,7 +230,7 @@ namespace ngs_petsc_interface
       .def("GetKSP", [](shared_ptr<PETScSNES> & snes) -> shared_ptr<PETScKSP> {
 	  return snes->GetKSP();
 	});
-      
+    
   }
 
 
