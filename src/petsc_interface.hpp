@@ -8,4 +8,6 @@
   
 #include "petsc_linalg.hpp"
 #include "petsc_pc.hpp"
+
 #include "petsc_ksp.hpp"
+#include "petsc_snes.hpp"

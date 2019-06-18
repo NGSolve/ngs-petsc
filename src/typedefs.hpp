@@ -3,9 +3,11 @@
 
 namespace ngs_petsc_interface
 {
+
   namespace ngs = ngcomp;
   using ngs::Array;
   using ngs::Range;
+
 
   using PETScVec = ::Vec;
 

@@ -12,17 +12,25 @@ namespace ngs_petsc_interface
   {
   public:
 
-    NGs2PETScVecMap (shared_ptr<ngs::ParallelDofs> _pardofs, shared_ptr<ngs::BitArray> _subset);
+    /** we have to give ndof and bs explicitely, because pardofs and subset can be nullptrs (not parallel / no Dirichlet BC)**/
+    NGs2PETScVecMap (size_t _ndof, int _bs, shared_ptr<ngs::ParallelDofs> _pardofs, shared_ptr<ngs::BitArray> _subset);
     
     shared_ptr<ngs::ParallelDofs> GetParallelDofs () const { return pardofs; }
 
     void NGs2PETSc (ngs::BaseVector& ngs_vec, PETScVec petsc_vec);
     void PETSc2NGs (ngs::BaseVector& ngs_vec, PETScVec petsc_vec);
 
+    size_t GetNRowsLocal  () const { return nrows_loc; }
+    size_t GetNRowsGlobal () const { return nrows_glob; }
+
     PETScVec CreatePETScVector () const;
     shared_ptr<ngs::BaseVector> CreateNGsVector () const;
 
+    shared_ptr<ngs::BitArray> GetSubSet () const { return subset; }
+
   protected:
+    size_t ndof;
+    int bs;
     shared_ptr<ngs::ParallelDofs> pardofs;
     shared_ptr<ngs::BitArray> subset;
     size_t nrows_loc, nrows_glob;
@@ -39,6 +47,9 @@ namespace ngs_petsc_interface
     { ; }
 
     ~PETScBaseMatrix () { MatDestroy(&petsc_mat); }
+
+    /** Call this if the NGSolve-Matrix has changed and you want to get the new values to PETSc **/
+    virtual void UpdateValues () { ; }
 
     // Maps that can convert the row/column space between NGSolve and PETSc
     virtual shared_ptr<NGs2PETScVecMap> GetRowMap () const { return row_map; }
@@ -86,6 +97,8 @@ namespace ngs_petsc_interface
   public:
     PETScMatrix (shared_ptr<ngs::BaseMatrix> _ngs_mat, shared_ptr<ngs::BitArray> _row_subset,
 		 shared_ptr<ngs::BitArray> _col_subset, PETScMatType _petsc_mat_type = MATMPIAIJ);
+
+    virtual void UpdateValues ();
   };
 
 

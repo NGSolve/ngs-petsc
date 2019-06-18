@@ -14,7 +14,6 @@ namespace ngs_petsc_interface
   
   void FinalizePETSc ();
 
-  
 } // ngs_petsc_interface
 
 #endif

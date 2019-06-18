@@ -61,19 +61,17 @@ def rb_modes(fes):
 
 petsc.Initialize()
 
-# mat_wrap = petsc.FlatPETScMatrix(a.mat, freedofs=V.FreeDofs())
 mat_wrap = petsc.PETScMatrix(a.mat, freedofs=V.FreeDofs())
-
 opts = {"ksp_type":"cg", "ksp_atol":1e-30, "ksp_rtol":1e-8, "pc_type":"ml"}
 ksp = petsc.KSP(mat=mat_wrap, name="someksp", petsc_options=opts, finalize=False)
+ksp.GetMatrix().SetNearNullSpace(rb_modes(V))
 
 # import ngs_amg
+# mat_wrap = petsc.FlatPETScMatrix(a.mat, freedofs=V.FreeDofs())
 # ngs_amg_opts = {"energy" : "alg", "comp_sm" : True, "force_comp_sm" : True, "max_cv" : 500, "ass_frac" : 0.15, "skip_ass" : 3}
 # ngs_pc = ngs_amg.AMG_EL2(blf=a, freedofs=V.FreeDofs(), **ngs_amg_opts)
 # ngs_pc = petsc.NGs2PETSc_PC(mat=mat_wrap, pc=ngs_pc)
 # ksp.SetPC(ngs_pc)
-
-ksp.GetMatrix().SetNearNullSpace(rb_modes(V))
 
 ksp.Finalize()
 

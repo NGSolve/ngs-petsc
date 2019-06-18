@@ -8,6 +8,51 @@ namespace ngs_petsc_interface
   template<> INLINE ngs::mat_traits<double>::TSCAL* get_ptr<double>(double & val) { return &val; }
 
   template<class TM>
+  void SetPETScMatSeq (PETScMat petsc_mat, shared_ptr<ngs::SparseMatrixTM<TM>> spmat, shared_ptr<ngs::BitArray> rss, shared_ptr<ngs::BitArray> css)
+  {
+    PetscInt bs; MatGetBlockSize(petsc_mat, &bs);
+    if (bs != ngs::mat_traits<TM>::WIDTH) {
+      throw Exception(string("Block-Size of petsc-mat (") + to_string(bs) + string(") != block-size of ngs-mat(")
+		      + to_string(ngs::mat_traits<TM>::WIDTH) + string(")"));
+    }
+	
+    // row map (map for a row)
+    PetscInt bw = ngs::mat_traits<TM>::WIDTH;
+    int nbrow = 0;
+    Array<int> row_compress(spmat->Width());
+    for (auto k : Range(spmat->Width()))
+      { row_compress[k] = (!rss || rss->Test(k)) ? nbrow++ : -1; }
+    int ncols = nbrow * bw;
+    
+    // col map (map for a col)
+    PetscInt bh = ngs::mat_traits<TM>::HEIGHT;
+    int nbcol = 0;
+    Array<int> col_compress(spmat->Height());
+    for (auto k : Range(spmat->Height()))
+      { col_compress[k] = (!css || css->Test(k)) ? nbcol++ : -1; }
+    int nrows = nbcol * bh;
+    
+    // vals
+    size_t len_vals = 0;
+    for (auto k : Range(spmat->Height())) {
+      PetscInt ck = col_compress[k];
+      if (ck != -1) {
+	auto ris = spmat->GetRowIndices(k);
+	auto rvs = spmat->GetRowValues(k);
+	for (auto j : Range(ris.Size())) {
+	  PetscInt cj = row_compress[ris[j]];
+	  if (cj != -1) {
+	    PetscScalar* data = get_ptr(rvs[j]);
+	    MatSetValuesBlocked(petsc_mat, 1, &ck, 1, &cj, data, INSERT_VALUES);
+	  }
+	}
+      }
+    }
+    MatAssemblyBegin(petsc_mat, MAT_FINAL_ASSEMBLY);
+    MatAssemblyEnd(petsc_mat, MAT_FINAL_ASSEMBLY);
+  }
+
+  template<class TM>
   PETScMat CreatePETScMatSeqBAIJ (shared_ptr<ngs::SparseMatrixTM<TM>> spmat, shared_ptr<ngs::BitArray> rss, shared_ptr<ngs::BitArray> css)
   {
 
@@ -86,34 +131,34 @@ namespace ngs_petsc_interface
   PETScMat CreatePETScMatSeq (shared_ptr<ngs::BaseMatrix> mat, shared_ptr<ngs::BitArray> rss, shared_ptr<ngs::BitArray> css)
   {
     if (auto spm = dynamic_pointer_cast<ngs::SparseMatrixTM<double>>(mat))
-      return CreatePETScMatSeqBAIJ(spm, rss, css);
+      { return CreatePETScMatSeqBAIJ(spm, rss, css); }
 #if MAX_SYS_DIM>=2
     if (auto spm = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<2>>>(mat))
-      return CreatePETScMatSeqBAIJ(spm, rss, css);
+      { return CreatePETScMatSeqBAIJ(spm, rss, css); }
 #endif
 #if MAX_SYS_DIM>=3
     if (auto spm = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<3>>>(mat))
-      return CreatePETScMatSeqBAIJ(spm, rss, css);
+      { return CreatePETScMatSeqBAIJ(spm, rss, css); }
 #endif
 #if MAX_SYS_DIM>=4
     if (auto spm = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<4>>>(mat))
-      return CreatePETScMatSeqBAIJ(spm, rss, css);
+      { return CreatePETScMatSeqBAIJ(spm, rss, css); }
 #endif
 #if MAX_SYS_DIM>=5
     if (auto spm = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<5>>>(mat))
-      return CreatePETScMatSeqBAIJ(spm, rss, css);
+      { return CreatePETScMatSeqBAIJ(spm, rss, css); }
 #endif
 #if MAX_SYS_DIM>=6
     if (auto spm = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<6>>>(mat))
-      return CreatePETScMatSeqBAIJ(spm, rss, css);
+      { return CreatePETScMatSeqBAIJ(spm, rss, css); }
 #endif
 #if MAX_SYS_DIM>=7
     if (auto spm = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<6>>>(mat))
-      return CreatePETScMatSeqBAIJ(spm, rss, css);
+      { return CreatePETScMatSeqBAIJ(spm, rss, css); }
 #endif
 #if MAX_SYS_DIM>=8
     if (auto spm = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<6>>>(mat))
-      return CreatePETScMatSeqBAIJ(spm, rss, css);
+      { return CreatePETScMatSeqBAIJ(spm, rss, css); }
 #endif
     throw Exception("Cannot make PETSc-Mat from this NGSolve-Mat!");
     return PETScMat(NULL);
@@ -124,6 +169,7 @@ namespace ngs_petsc_interface
   {
     MatSetNullSpace(GetPETScMat(), null_space);
   }
+
 
   void PETScBaseMatrix :: SetNearNullSpace (MatNullSpace null_space)
   {
@@ -195,16 +241,24 @@ namespace ngs_petsc_interface
   } // CreatePETScMatIS
 
 
-  NGs2PETScVecMap :: NGs2PETScVecMap (shared_ptr<ngs::ParallelDofs> _pardofs, shared_ptr<ngs::BitArray> _subset)
-    : pardofs(_pardofs), subset(_subset)
+  NGs2PETScVecMap :: NGs2PETScVecMap (size_t _ndof, int _bs, shared_ptr<ngs::ParallelDofs> _pardofs, shared_ptr<ngs::BitArray> _subset)
+    : ndof(_ndof), bs(_bs), pardofs(_pardofs), subset(_subset)
   {
-    auto bs = pardofs->GetEntrySize();
-    nrows_loc = 0;
-    for (auto k : Range(pardofs->GetNDofLocal()))
-      if (pardofs->IsMasterDof(k) && (!subset || subset->Test(k)))
-	nrows_loc += bs;
-    nrows_glob = pardofs->GetCommunicator().AllReduce(nrows_loc, MPI_SUM);
-  } // NGs2PETScVecMap
+    if ( (!pardofs) && (!subset) )
+      { nrows_loc = bs * ndof; }
+    else {
+      nrows_loc = 0;
+      for (auto k : Range(ndof))
+	if ( (!pardofs || pardofs->IsMasterDof(k)) && (!subset || subset->Test(k)))
+	  nrows_loc += bs;
+    }
+    nrows_glob = (pardofs == nullptr) ? nrows_loc : pardofs->GetCommunicator().AllReduce(nrows_loc, MPI_SUM);
+
+    cout << "ba len: " << (subset ? subset->Size() : ndof) << endl;
+    cout << "ba set: " << (subset ? subset->NumSet() : ndof) << endl;
+    cout << "vec map, " << ndof << " " << bs << " " << nrows_loc << " " << nrows_glob << endl;
+
+  }
 
 
   void NGs2PETScVecMap :: NGs2PETSc (ngs::BaseVector& ngs_vec, PETScVec petsc_vec)
@@ -212,10 +266,9 @@ namespace ngs_petsc_interface
     ngs_vec.Cumulate();
     PetscScalar * pvs; VecGetArray(petsc_vec, &pvs);
     size_t cnt = 0;
-    auto bs = pardofs->GetEntrySize();
     auto fv = ngs_vec.FVDouble();
-    for (auto k : Range(pardofs->GetNDofLocal()))
-      if (pardofs->IsMasterDof(k) && (!subset || subset->Test(k)))
+    for (auto k : Range(ndof))
+      if ( (!pardofs || pardofs->IsMasterDof(k)) && (!subset || subset->Test(k)))
 	for (auto l : Range(bs))
 	  { pvs[cnt++] = fv(bs*k+l); }
     VecRestoreArray(petsc_vec, &pvs);
@@ -227,10 +280,9 @@ namespace ngs_petsc_interface
     ngs_vec.Distribute();
     const PetscScalar * pvs; VecGetArrayRead(petsc_vec, &pvs);
     size_t cnt = 0;
-    auto bs = pardofs->GetEntrySize();
     auto fv = ngs_vec.FVDouble();
-    for (auto k : Range(pardofs->GetNDofLocal()))
-      if (pardofs->IsMasterDof(k) && (!subset || subset->Test(k)))
+    for (auto k : Range(ndof))
+      if ( (!pardofs || pardofs->IsMasterDof(k)) && (!subset || subset->Test(k)))
 	for (auto l : Range(bs))
 	  { fv(bs*k+l) = pvs[cnt++]; }
       else
@@ -242,12 +294,19 @@ namespace ngs_petsc_interface
 
   shared_ptr<ngs::BaseVector> NGs2PETScVecMap :: CreateNGsVector () const
   {
-    return make_shared<ngs::S_ParallelBaseVectorPtr<double>> (pardofs->GetNDofLocal(), pardofs->GetEntrySize(), pardofs, ngs::DISTRIBUTED);
+    if (pardofs)
+      { return make_shared<ngs::S_ParallelBaseVectorPtr<double>> (pardofs->GetNDofLocal(), pardofs->GetEntrySize(), pardofs, ngs::DISTRIBUTED); }
+    else
+      { return make_shared<ngs::S_BaseVectorPtr<double>> (ndof, bs); }
   } // CreateNGsVector
 
   PETScVec NGs2PETScVecMap :: CreatePETScVector () const
   {
-    PETScVec v; VecCreateMPI(pardofs->GetCommunicator(), nrows_loc, nrows_glob, &v);
+    PETScVec v;
+    if (pardofs == nullptr)
+      { VecCreateSeq(PETSC_COMM_SELF, nrows_loc, &v); }
+    else
+      { VecCreateMPI(pardofs->GetCommunicator(), nrows_loc, nrows_glob, &v); }
     return v;
   } // CreatePETScVector
 
@@ -256,34 +315,72 @@ namespace ngs_petsc_interface
 			      shared_ptr<ngs::BitArray> _col_subset, PETScMatType _petsc_mat_type)
     : PETScBaseMatrix(_ngs_mat, _row_subset, _col_subset)
   {
-
     auto parmat = dynamic_pointer_cast<ngs::ParallelMatrix>(ngs_mat);
-    auto row_pardofs = parmat->GetRowParallelDofs();
-    auto col_pardofs = parmat->GetColParallelDofs();
-    auto comm = row_pardofs->GetCommunicator();
 
-    auto spmat = dynamic_pointer_cast<ngs::BaseSparseMatrix>(parmat->GetMatrix());
+    bool parallel = parmat != nullptr;
+
+    shared_ptr<ngs::ParallelDofs> row_pardofs, col_pardofs;
+    if (parallel) {
+      row_pardofs = parmat->GetRowParallelDofs();
+      col_pardofs = parmat->GetColParallelDofs();
+    }
+    else
+      { row_pardofs = col_pardofs = nullptr; }
+
+    shared_ptr<ngs::BaseSparseMatrix> spmat = dynamic_pointer_cast<ngs::BaseSparseMatrix>( parallel ? parmat->GetMatrix() : ngs_mat);
     if (!spmat) { throw Exception("Can only convert Sparse Matrices to PETSc."); }
 
     // local PETSc matrix
-    PETScMat petsc_mat_loc = CreatePETScMatSeq(parmat->GetMatrix(), row_subset, col_subset);
+    PETScMat petsc_mat_loc = CreatePETScMatSeq(spmat, row_subset, col_subset);
 
     // parallel PETSc matrix
-    petsc_mat = CreatePETScMatIS (petsc_mat_loc, row_pardofs, col_pardofs, row_subset, col_subset);
+    petsc_mat = parallel ? CreatePETScMatIS (petsc_mat_loc, row_pardofs, col_pardofs, row_subset, col_subset) : petsc_mat_loc;
 
-    if (_petsc_mat_type != MATIS)
+    int bs; MatGetBlockSize(petsc_mat, &bs);
+    
+    MatType pmt; MatGetType(petsc_mat, &pmt);
+    if (pmt != _petsc_mat_type)
       {
-	MatSetBlockSize(petsc_mat, row_pardofs->GetEntrySize());
+	// MatSetBlockSize(petsc_mat, row_pardofs->GetEntrySize());
 	MatConvert(petsc_mat, _petsc_mat_type, MAT_INPLACE_MATRIX, &petsc_mat);
       }
 
     // Vector conversions
-    if (!row_map)
-      { row_map = make_shared<NGs2PETScVecMap>(row_pardofs, row_subset); }
-    if (!col_map)
-      { col_map = make_shared<NGs2PETScVecMap>(col_pardofs, col_subset); }
+    if (!row_map) {
+      row_map = parallel ? make_shared<NGs2PETScVecMap>(row_pardofs->GetNDofLocal(), bs, row_pardofs, row_subset)
+	: make_shared<NGs2PETScVecMap>(spmat->Width(), bs, nullptr, row_subset);
+    }
+    if (!col_map) {
+      col_map = parallel ? make_shared<NGs2PETScVecMap>(col_pardofs->GetNDofLocal(), bs, col_pardofs, col_subset)
+	: make_shared<NGs2PETScVecMap>(spmat->Height(), bs, nullptr, row_subset);
+    }
 
   } // PETScMatrix
+
+
+  void PETScMatrix :: UpdateValues ()
+  {
+    auto parmat = dynamic_pointer_cast<ngs::ParallelMatrix>(ngs_mat);
+    shared_ptr<BaseMatrix> mat = (parmat == nullptr) ? ngs_mat : parmat->GetMatrix();
+    if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<double>>(mat))
+      { SetPETScMatSeq (petsc_mat, spmat, GetRowMap()->GetSubSet(), GetColMap()->GetSubSet()); }
+    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<Mat<2,2,double>>>(mat))
+      { SetPETScMatSeq (petsc_mat, spmat, GetRowMap()->GetSubSet(), GetColMap()->GetSubSet()); }
+    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<Mat<3,3,double>>>(mat))
+      { SetPETScMatSeq (petsc_mat, spmat, GetRowMap()->GetSubSet(), GetColMap()->GetSubSet()); }
+    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<Mat<4,4,double>>>(mat))
+      { SetPETScMatSeq (petsc_mat, spmat, GetRowMap()->GetSubSet(), GetColMap()->GetSubSet()); }
+    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<Mat<5,5,double>>>(mat))
+      { SetPETScMatSeq (petsc_mat, spmat, GetRowMap()->GetSubSet(), GetColMap()->GetSubSet()); }
+    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<Mat<6,6,double>>>(mat))
+      { SetPETScMatSeq (petsc_mat, spmat, GetRowMap()->GetSubSet(), GetColMap()->GetSubSet()); }
+    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<Mat<7,7,double>>>(mat))
+      { SetPETScMatSeq (petsc_mat, spmat, GetRowMap()->GetSubSet(), GetColMap()->GetSubSet()); }
+    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<Mat<8,8,double>>>(mat))
+      { SetPETScMatSeq (petsc_mat, spmat, GetRowMap()->GetSubSet(), GetColMap()->GetSubSet()); }
+    else
+      { throw Exception("Can not update values for this kind of mat!!");}
+  }
 
 
   FlatPETScMatrix :: FlatPETScMatrix (shared_ptr<ngs::BaseMatrix> _ngs_mat, shared_ptr<ngs::BitArray> _row_subset,
@@ -301,43 +398,52 @@ namespace ngs_petsc_interface
       { row_pardofs = col_pardofs = pc->GetAMatrix().GetParallelDofs(); }
     else // can also be a preconditioner, a ProductMatrix, etc..
       { row_pardofs = col_pardofs = GetNGsMat()->GetParallelDofs(); }
-    auto comm = row_pardofs->GetCommunicator();
 
-    int bs = row_pardofs->GetNDofLocal();
+    bool parallel = row_pardofs != nullptr;
 
-    // Vector conversions
-    row_map = make_shared<NGs2PETScVecMap>(row_pardofs, row_subset);
-    col_map = make_shared<NGs2PETScVecMap>(col_pardofs, col_subset);
+    MPI_Comm comm;
+    if (parallel)
+      { comm = row_pardofs->GetCommunicator(); }
+    else
+      { comm = PETSC_COMM_SELF; }
 
     // working vectors
-    row_hvec = row_map->CreateNGsVector();
-    col_hvec = col_map->CreateNGsVector();
+    row_hvec = ngs_mat->CreateRowVector();
+    col_hvec = ngs_mat->CreateColVector();
+
+    int bs = (ngs_mat->Width() > 0) ? // rank 0 has size 0 mat
+      row_hvec->FVDouble().Size() / ngs_mat->Width()
+      : row_pardofs->GetEntrySize(); // this feels a bit hacky...
+
+    cout << "fvs: " << row_hvec->FVDouble().Size() << endl;
+    cout << "type vec " << typeid(*row_hvec).name() << endl;
+    cout << "type amt; " << typeid(*ngs_mat).name() << endl;
+    cout << "width: " << ngs_mat->Width() << endl;
+    
+    // Vector conversions
+    cout << "RM " << endl;
+    row_map = make_shared<NGs2PETScVecMap>(_ngs_mat->Width(), bs, row_pardofs, row_subset);
+    cout << "CM " << endl;
+    col_map = ( (row_pardofs == col_pardofs) && (_row_subset == _col_subset) ) ? row_map :
+      make_shared<NGs2PETScVecMap>(_ngs_mat->Height(), bs, col_pardofs, col_subset);
+
+    // working vectors
+    // row_hvec = row_map->CreateNGsVector();
+    // col_hvec = col_map->CreateNGsVector();
 
     // Create a Shell matrix, where we have to set function pointers for operations
     // ( the "this" - pointer can be recovered with MatShellGetConext )
-    size_t nrows_loc = 0, ncols_loc = 0;
-    for (auto k : Range(row_pardofs->GetNDofLocal()))
-      if (row_pardofs->IsMasterDof(k) && (!_row_subset || _row_subset->Test(k)) )
-	{ nrows_loc += bs; }
-    size_t nrows_glob = comm.AllReduce(nrows_loc, MPI_SUM), ncols_glob = 0;
-    if (row_pardofs == col_pardofs)
-      {
-	ncols_loc  = nrows_loc;
-	ncols_glob = nrows_glob;
-      }
-    else {
-      for (auto k : Range(col_pardofs->GetNDofLocal()))
-	if (col_pardofs->IsMasterDof(k) && (!_col_subset || _col_subset->Test(k)) )
-	  { ncols_loc += bs; }
-      ncols_glob = comm.AllReduce(ncols_loc, MPI_SUM);
-    }
-    MatCreateShell (comm, nrows_loc, ncols_loc, nrows_glob, ncols_glob, (void*) this, &petsc_mat);
+    cout << "MATSHELL " << endl;
+    cout << " " << row_map->GetNRowsLocal() << " " << col_map->GetNRowsLocal() << " " << row_map->GetNRowsGlobal() << " " << col_map->GetNRowsGlobal() << endl;
+    MatCreateShell (comm, row_map->GetNRowsLocal(), col_map->GetNRowsLocal(), row_map->GetNRowsGlobal(), col_map->GetNRowsGlobal(), (void*) this, &petsc_mat);
 
     /** Set function pointers **/
+    cout << "MATSHELL OPS" << endl;
     
     // MatMult: y = A * x
     MatShellSetOperation(petsc_mat, MATOP_MULT, (void(*)(void)) this->MatMult);
     
+    cout << "MS DONE" << endl;
 
   } // FlatPETScMatrix
 
@@ -377,7 +483,12 @@ namespace ngs_petsc_interface
 	VecNormalize(petsc_vecs[i],NULL);
       }
     }
-    MatNullSpace ns; MatNullSpaceCreate(map->GetParallelDofs()->GetCommunicator(), const_kernel ? PETSC_TRUE : PETSC_FALSE, vecs.Size(), &petsc_vecs[0], &ns);
+    MPI_Comm comm;
+    if (auto pds = map->GetParallelDofs())
+      { comm = pds->GetCommunicator(); }
+    else
+      { comm = PETSC_COMM_SELF; }
+    MatNullSpace ns; MatNullSpaceCreate(comm, const_kernel ? PETSC_TRUE : PETSC_FALSE, vecs.Size(), &petsc_vecs[0], &ns);
     for (auto v : petsc_vecs) // destroy vecs (reduces reference count by 1)
       { VecDestroy(&v); }
     return ns;

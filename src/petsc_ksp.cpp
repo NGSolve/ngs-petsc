@@ -32,12 +32,17 @@ namespace ngs_petsc_interface
   }
 
   PETScKSP :: PETScKSP (shared_ptr<PETScBaseMatrix> _petsc_mat, FlatArray<string> _opts, string _name)
-    : BaseMatrix(_petsc_mat->GetRowMap()->GetParallelDofs()), petsc_mat(_petsc_mat)
+    : BaseMatrix(_petsc_mat->GetRowMap()->GetParallelDofs()), petsc_mat(_petsc_mat), own_ksp(true)
   {
-    auto comm = _petsc_mat->GetNGsMat()->GetParallelDofs()->GetCommunicator();
-    
+    auto pds = petsc_mat->GetRowMap()->GetParallelDofs();
+    MPI_Comm comm;
+    if (pds != nullptr)
+      { comm = pds->GetCommunicator(); }
+    else
+      { comm = PETSC_COMM_SELF; }
+
     // Create KSP
-    KSPCreate(comm, &ksp);
+    KSPCreate(comm, &GetKSP());
 
     // set prefix so we can define unique options for this KSP object
     string name = (_name.size()) ? _name : GetDefaultId(); name += string("_");
@@ -61,11 +66,21 @@ namespace ngs_petsc_interface
     : PETScKSP (make_shared<PETScMatrix> (_ngs_mat, _freedofs, _freedofs, MATMPIAIJ), _opts, _name)
   { ; }
 
+
+  PETScKSP :: PETScKSP (shared_ptr<PETScBaseMatrix> _petsc_mat, KSP _ksp)
+    : petsc_mat(_petsc_mat), ksp(_ksp), own_ksp(false)
+  {
+    // Tell PETSc to allocate space to store residual history (per default 1e4) and to reset for each solve
+    KSPSetResidualHistory(GetKSP(), NULL, PETSC_DECIDE, PETSC_TRUE);
+  }
+
+
   PETScKSP :: ~PETScKSP ()
     {
       petsc_pc = nullptr;
       petsc_mat = nullptr;
-      KSPDestroy(&ksp);
+      if (own_ksp)
+	{ KSPDestroy(&ksp); }
     }
 
 
@@ -111,29 +126,14 @@ namespace ngs_petsc_interface
   
   void ExportKSP (py::module &m)
   {
-    auto convert_opts = [](auto & petsc_options) -> Array<string> {
-      Array<string> opt_array;
-      auto ValStr = [&](const auto & Ob) -> string {
-	if (py::isinstance<py::str>(Ob))
-	  return Ob.template cast<string>();
-	if (py::isinstance<py::bool_>(Ob))
-	  return Ob.template cast<bool>()==true ? "1" : "0";
-	if (py::isinstance<py::float_>(Ob) ||
-	    py::isinstance<py::int_>(Ob))
-	  return py::str(Ob).cast<string>();
-	return "COULD_NOT_CONVERT";
-      };
-      for (auto item : petsc_options)
-	{ opt_array.Append(item.first.template cast<string>() + string(" ") + ValStr(item.second)); }
-      return opt_array;
-    };
+    extern Array<string> Dict2SA (py::dict & petsc_options);
 
     py::class_<PETScKSP, shared_ptr<PETScKSP>, ngs::BaseMatrix>
       (m, "KSP", "")
       .def(py::init<>
 	   ([&] (shared_ptr<ngs::BaseMatrix> mat, shared_ptr<ngs::BitArray> freedofs,
 		string name, bool finalize, py::dict petsc_options) {
-	     auto opt_array = convert_opts(petsc_options);
+	     auto opt_array = Dict2SA(petsc_options);
 	     auto ksp = make_shared<PETScKSP>(mat, freedofs, opt_array, name);
 	     if (finalize)
 	       { ksp->Finalize(); }
@@ -145,7 +145,7 @@ namespace ngs_petsc_interface
 	   )
       .def(py::init<>
 	   ([&] (shared_ptr<PETScBaseMatrix> mat, string name, bool finalize, py::dict petsc_options) {
-	     auto opt_array = convert_opts(petsc_options);
+	     auto opt_array = Dict2SA(petsc_options);
 	     auto ksp = make_shared<PETScKSP>(mat, opt_array, name);
 	     if (finalize)
 	       { ksp->Finalize(); }
