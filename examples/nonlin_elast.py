@@ -72,7 +72,7 @@ petsc_options = {"pc_type" : "none",
                  #"snes_converged_reason" : "",
                  "snes_max_it" : 50,
                  "snes_linesearch_type" : "basic" }
-snes = petsc.SNES(a, name="mysnes", petsc_options=petsc_options, mode = petsc.SNES.JACOBI_MAT_MODE.CONVERT)
+snes = petsc.SNES(a, name="mysnes", petsc_options=petsc_options, mode = petsc.SNES.JACOBI_MAT_MODE.APPLY)
 snes_ksp = snes.GetKSP()
 
 res1 = gfu.vec.CreateVector()

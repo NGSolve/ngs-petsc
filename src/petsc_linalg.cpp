@@ -32,8 +32,7 @@ namespace ngs_petsc_interface
     for (auto k : Range(spmat->Height()))
       { col_compress[k] = (!css || css->Test(k)) ? nbcol++ : -1; }
     int nrows = nbcol * bh;
-    
-    // vals
+
     size_t len_vals = 0;
     for (auto k : Range(spmat->Height())) {
       PetscInt ck = col_compress[k];
@@ -57,30 +56,45 @@ namespace ngs_petsc_interface
   template<class TM>
   void SetPETScMatIS (PETScMat petsc_mat, shared_ptr<ngs::SparseMatrixTM<TM>> spmat, shared_ptr<ngs::BitArray> rss, shared_ptr<ngs::BitArray> css)
   {
+    /** If the PETSc-Mat is in MATIS format, we can just directly replace entries in it's local matrix **/
+
     PETScMat local_mat; MatISGetLocalMat(petsc_mat, &local_mat);
     SetPETScMatSeq (local_mat, spmat, rss, css);
-  }
+  } // SetPETScMatPar
 
   template<class TM>
   void SetPETScMatPar (PETScMat petsc_mat, shared_ptr<ngs::SparseMatrixTM<TM>> spmat, shared_ptr<NGs2PETScVecMap> row_map, shared_ptr<NGs2PETScVecMap> col_map)
   {
+    /**
+       We have to zero out the matrix and then ADD values (instead of SET them)
+       because in NGSolve we have an "IS"-Style matrix (overlapping diagonal blocks, with one block per proc)
+       but petsc_mat is in MATMPIAIJ or MATMPIBAIJ format, which is simply distributed row-wise
+     **/
+
     PetscInt bs = ngs::mat_traits<TM>::WIDTH;
 
-    cout << "SET MAT PAR " << endl;
-
-    auto rss = row_map->GetSubSet();
-    auto row_pardofs = row_map->GetParallelDofs();
-    auto css = col_map->GetSubSet();
-    auto col_pardofs = col_map->GetParallelDofs();
-    bool same_spaces = ( (row_pardofs == col_pardofs) && (rss == css) );
-
-    // we need the map from local to global values
-    ISLocalToGlobalMapping is_row_map, is_col_map;
-    MatGetLocalToGlobalMapping(petsc_mat, &is_col_map, &is_row_map); // (switched row/col is correct!!)
-
-    Array<int> glob_nums_row, glob_nums_col;
+    auto row_dm = row_map->GetDOFMap();
+    auto col_dm = col_map->GetDOFMap();
     
-  }
+    MatZeroEntries(petsc_mat);
+
+    for (auto k : Range(spmat->Height())) {
+      PetscInt ck = col_dm[k];
+      if (ck != -1) {
+	auto ris = spmat->GetRowIndices(k);
+	auto rvs = spmat->GetRowValues(k);
+	for (auto j : Range(ris.Size())) {
+	  PetscInt cj = row_dm[ris[j]];
+	  if (cj != -1) {
+	    PetscScalar* data = get_ptr(rvs[j]);
+	    MatSetValuesBlocked(petsc_mat, 1, &ck, 1, &cj, data, ADD_VALUES);
+	  }
+	}
+      }
+    }
+    MatAssemblyBegin(petsc_mat, MAT_FINAL_ASSEMBLY);
+    MatAssemblyEnd(petsc_mat, MAT_FINAL_ASSEMBLY);
+  } // SetPETScMatPar
 
   template<class TM>
   void SetPETScMat (PETScMat petsc_mat, shared_ptr<ngs::SparseMatrixTM<TM>> spmat, shared_ptr<NGs2PETScVecMap> row_map, shared_ptr<NGs2PETScVecMap> col_map)
@@ -256,28 +270,21 @@ namespace ngs_petsc_interface
 	if ( (!pardofs || pardofs->IsMasterDof(k)) && (!subset || subset->Test(k)))
 	  { nrows_loc += bs; }
 
+      Array<int> globnums;
       if (pardofs) {
-	Array<int> globnums;
 	int glob_nd = 0;
+	size_t cnt = 0;
+	Array<PetscInt> compress_globnums(ndof);
 	pardofs->EnumerateGlobally(subset, globnums, glob_nd);
-	for (auto k : Range(ndof)) // (PetscInt != int is possibe, but EnumerateGlobally only for ints...)
-	  {
-	    dof_map[k] = globnums[k];
-	  }
-	if (subset) {
-	  size_t cnt = 0;
-	  Array<PetscInt> compress_globnums(subset->NumSet());
-	  for (auto k : Range(ndof)) // (PetscInt != int is possibe, but EnumerateGlobally only for ints...)
-	    if ( (globnums[k] != -1) && (pardofs->IsMasterDof(k)) )
-	      { compress_globnums[cnt++] = globnums[k]; }
-	  compress_globnums.SetSize(cnt);
-	  ISLocalToGlobalMappingCreate(pardofs->GetCommunicator(), bs, compress_globnums.Size(), &compress_globnums[0], PETSC_COPY_VALUES, &is_map);
+	for (auto k : Range(ndof)) {
+	  dof_map[k] = globnums[k]; // (PetscInt != int is possibe, but EnumerateGlobally only for ints...)
+	  if (globnums[k] != -1)
+	    { compress_globnums[cnt++] = globnums[k]; }
 	}
-	else {
-	  ISLocalToGlobalMappingCreate(pardofs->GetCommunicator(), bs, dof_map.Size(), &dof_map[0], PETSC_COPY_VALUES, &is_map);
-	}
+	compress_globnums.SetSize(cnt);
+	ISLocalToGlobalMappingCreate(pardofs->GetCommunicator(), bs, compress_globnums.Size(), &compress_globnums[0], PETSC_COPY_VALUES, &is_map);
       }
-      else // must have a subset
+      else // subset + sequential
 	{
 	  int cnt = 0;
 	  for (auto k : Range(ndof))

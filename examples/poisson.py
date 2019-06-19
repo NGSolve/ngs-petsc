@@ -44,8 +44,8 @@ ex_sol = False
 #opts = {"ksp_type":"cg", "ksp_atol":1e-30, "ksp_rtol":1e-8, "pc_type":"ml", "pc_ml_PrintLevel" : "3"}
 opts = {"ksp_type":"cg", "ksp_atol":1e-30, "ksp_rtol":1e-8}
 
-#mat_wrap = petsc.PETScMatrix(a.mat, freedofs=V.FreeDofs())
-mat_wrap = petsc.FlatPETScMatrix(a.mat, freedofs=V.FreeDofs())
+mat_wrap = petsc.PETScMatrix(a.mat, freedofs=V.FreeDofs())
+#mat_wrap = petsc.FlatPETScMatrix(a.mat, freedofs=V.FreeDofs())
 ksp = petsc.KSP(mat=mat_wrap, name="someksp", petsc_options=opts, finalize=False)
 
 # import ngs_amg

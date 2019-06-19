@@ -45,7 +45,7 @@ namespace ngs_petsc_interface
     shared_ptr<ngs::BitArray> subset;
     size_t nrows_loc, nrows_glob;
     Array<PetscInt> dof_map;         // maps ALL DOFS (not rows!) to global nums, non-subset get -1
-    ISLocalToGlobalMapping is_map;   // maps MASTER + SUBSET DOFS (not rows!) to global nums (only constructed if parallel)
+    ISLocalToGlobalMapping is_map;   // maps SUBSET DOFS (not rows!) to global nums (only constructed if parallel)
   };
 
   /** Ports an NGSolve-BaseMatrix to PETSc **/
