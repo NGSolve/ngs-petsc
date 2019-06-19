@@ -143,7 +143,11 @@ namespace ngs_petsc_interface
 	    { c++; }
       }
     }
-    PETScMat petsc_mat; MatCreateSeqBAIJ(PETSC_COMM_SELF, bh, nrows, ncols, -1, &nzepr[0], &petsc_mat); 
+    PETScMat petsc_mat;
+    if (bh == 1)
+      { MatCreateSeqAIJ(PETSC_COMM_SELF, nrows, ncols, -1, &nzepr[0], &petsc_mat); }
+    else
+      { MatCreateSeqBAIJ(PETSC_COMM_SELF, bh, nrows, ncols, -1, &nzepr[0], &petsc_mat); }
 
     // cols
     int n_b_entries = 0;
@@ -269,7 +273,6 @@ namespace ngs_petsc_interface
       for (auto k : Range(ndof))
 	if ( (!pardofs || pardofs->IsMasterDof(k)) && (!subset || subset->Test(k)))
 	  { nrows_loc += bs; }
-
       Array<int> globnums;
       if (pardofs) {
 	int glob_nd = 0;
@@ -292,13 +295,7 @@ namespace ngs_petsc_interface
 	      { dof_map[k] = cnt++; }
 	}
     }
-
     nrows_glob = (pardofs == nullptr) ? nrows_loc : pardofs->GetCommunicator().AllReduce(nrows_loc, MPI_SUM);
-
-    cout << "ba len: " << (subset ? subset->Size() : ndof) << endl;
-    cout << "ba set: " << (subset ? subset->NumSet() : ndof) << endl;
-    cout << "vec map, " << ndof << " " << bs << " " << nrows_loc << " " << nrows_glob << endl;
-
   }
 
   NGs2PETScVecMap :: ~NGs2PETScVecMap ()
@@ -461,50 +458,41 @@ namespace ngs_petsc_interface
 
     bool parallel = row_pardofs != nullptr;
 
-    MPI_Comm comm;
-    if (parallel)
-      { comm = row_pardofs->GetCommunicator(); }
-    else
-      { comm = PETSC_COMM_SELF; }
+    MPI_Comm comm = (parallel) ? MPI_Comm(row_pardofs->GetCommunicator()) : PETSC_COMM_SELF;
 
     // working vectors
     row_hvec = ngs_mat->CreateRowVector();
     col_hvec = ngs_mat->CreateColVector();
 
-    int bs = (ngs_mat->Width() > 0) ? // rank 0 has size 0 mat
-      row_hvec->FVDouble().Size() / ngs_mat->Width()
-      : row_pardofs->GetEntrySize(); // this feels a bit hacky...
-
-    cout << "fvs: " << row_hvec->FVDouble().Size() << endl;
-    cout << "type vec " << typeid(*row_hvec).name() << endl;
-    cout << "type amt; " << typeid(*ngs_mat).name() << endl;
-    cout << "width: " << ngs_mat->Width() << endl;
-    
     // Vector conversions
-    cout << "RM " << endl;
-    row_map = make_shared<NGs2PETScVecMap>(_ngs_mat->Width(), bs, row_pardofs, row_subset);
-    cout << "CM " << endl;
-    col_map = ( (row_pardofs == col_pardofs) && (_row_subset == _col_subset) ) ? row_map :
-      make_shared<NGs2PETScVecMap>(_ngs_mat->Height(), bs, col_pardofs, col_subset);
-
-    // working vectors
-    // row_hvec = row_map->CreateNGsVector();
-    // col_hvec = col_map->CreateNGsVector();
+    if (row_map == nullptr) {
+	int bs; // this is pretty hacky ... why don't we have this info in NGSolve??
+	if (row_map != nullptr)
+	  { bs = row_map->GetBS(); }
+	else if (parallel)
+	  { bs = row_pardofs->GetEntrySize(); }
+	else if (ngs_mat->Width())
+	  { bs = row_hvec->FVDouble().Size() / ngs_mat->Width(); }
+	else // 0 x 0 sequantial matrix ... ffs, just set bs to 1 and hope for the best
+	  { bs = 1; }
+	row_map = make_shared<NGs2PETScVecMap>(_ngs_mat->Width(), bs, row_pardofs, row_subset);
+      }
+    if (col_map == nullptr) {
+      col_map = ( (row_pardofs == col_pardofs) && (_row_subset == _col_subset) ) ? row_map :
+	make_shared<NGs2PETScVecMap>(_ngs_mat->Height(), row_map->GetBS(), col_pardofs, col_subset);
+    }
 
     // Create a Shell matrix, where we have to set function pointers for operations
     // ( the "this" - pointer can be recovered with MatShellGetConext )
-    cout << "MATSHELL " << endl;
-    cout << " " << row_map->GetNRowsLocal() << " " << col_map->GetNRowsLocal() << " " << row_map->GetNRowsGlobal() << " " << col_map->GetNRowsGlobal() << endl;
+    // cout << "MATSHELL " << endl;
+    // cout << " " << row_map->GetNRowsLocal() << " " << col_map->GetNRowsLocal() << " " << row_map->GetNRowsGlobal() << " " << col_map->GetNRowsGlobal() << endl;
     MatCreateShell (comm, row_map->GetNRowsLocal(), col_map->GetNRowsLocal(), row_map->GetNRowsGlobal(), col_map->GetNRowsGlobal(), (void*) this, &petsc_mat);
 
     /** Set function pointers **/
-    cout << "MATSHELL OPS" << endl;
     
     // MatMult: y = A * x
     MatShellSetOperation(petsc_mat, MATOP_MULT, (void(*)(void)) this->MatMult);
     
-    cout << "MS DONE" << endl;
-
   } // FlatPETScMatrix
 
 

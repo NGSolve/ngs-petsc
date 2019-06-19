@@ -27,8 +27,8 @@ E, nu = 210, 0.2
 mu  = E / 2 / (1+nu)
 lam = E * nu / ((1+nu)*(1-2*nu))
 
-#V = H1(mesh, order=1, dirichlet="left", dim=mesh.dim)
-V = VectorH1(mesh, order=1, dirichlet="left")
+V = H1(mesh, order=1, dirichlet="left", dim=mesh.dim)
+#V = VectorH1(mesh, order=1, dirichlet="left")
 u  = V.TrialFunction()
 
 #gravity:
@@ -64,15 +64,15 @@ petsc_options = {"pc_type" : "none",
                  "ksp_atol" : 1e-30,
                  "ksp_rtol" : 1e-8,
                  "ksp_max_it" : 1000,
-                 #"ksp_view" : "",
-                 #"ksp_monitor" : "",
-                 #"ksp_converged_reason" : "",
-                 #"snes_view" : "",
-                 #"snes_monitor" : "",
-                 #"snes_converged_reason" : "",
+                 # "ksp_view" : "",
+                 # "ksp_monitor" : "",
+                 # "ksp_converged_reason" : "",
+                 # "snes_view" : "",
+                 # "snes_monitor" : "",
+                 # "snes_converged_reason" : "",
                  "snes_max_it" : 50,
                  "snes_linesearch_type" : "basic" }
-snes = petsc.SNES(a, name="mysnes", petsc_options=petsc_options, mode = petsc.SNES.JACOBI_MAT_MODE.APPLY)
+snes = petsc.SNES(a, name="mysnes", petsc_options=petsc_options, mode = petsc.SNES.JACOBI_MAT_MODE.FLAT)
 snes_ksp = snes.GetKSP()
 
 res1 = gfu.vec.CreateVector()
@@ -111,7 +111,7 @@ import sys
 Draw (mesh, deformation=gfu,  name="u - ptc")
 Draw (mesh, deformation=gfu2, name="u - ngs")
 ngsglobals.msg_level = 0
-for loadstep in range(1):
+for loadstep in range(50):
     print ("Solve loadstep", loadstep)
     sys.stdout.flush()
     factor.Set ((loadstep+1)/10)

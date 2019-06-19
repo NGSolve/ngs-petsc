@@ -35,11 +35,9 @@ namespace ngs_petsc_interface
       { use_lh = make_shared<ngs::LocalHeap>(10*1024*1024); }
 
     auto pardofs = blf->GetTrialSpace()->GetParallelDofs();
-    MPI_Comm comm;
-    if (pardofs != nullptr)
-      { comm = pardofs->GetCommunicator(); }
-    else
-      { comm = PETSC_COMM_SELF; }
+    bool parallel = pardofs != nullptr;
+
+    MPI_Comm comm = (parallel) ? MPI_Comm(pardofs->GetCommunicator()) : PETSC_COMM_SELF;
 
     auto row_fds = blf->GetTrialSpace()->GetFreeDofs();
     auto col_fds = blf->GetTestSpace()->GetFreeDofs();
@@ -61,7 +59,10 @@ namespace ngs_petsc_interface
     auto col_map = make_shared<NGs2PETScVecMap>(tss->GetNDof(), tss->GetDimension(), tss->GetParallelDofs(), tss->GetFreeDofs());
 
     if (mode == APPLY) {
-      auto lap = make_shared<ngs::LinearizedBilinearFormApplication>(blf, lin_vec.get(), *use_lh);
+      // This is currently broken in NGSolve. Also, even if fixed, it is terribly slow.
+      shared_ptr<ngs::BaseMatrix> lap = make_shared<ngs::LinearizedBilinearFormApplication>(blf, lin_vec.get(), *use_lh);
+      if (parallel)
+	{ lap = make_shared<ngs::ParallelMatrix> (lap, blf->GetTrialSpace()->GetParallelDofs(), blf->GetTestSpace()->GetParallelDofs(), ngs::C2D); }
       jac_mat = make_shared<FlatPETScMatrix> (lap, nullptr, nullptr, row_map, col_map);
     }
     else {
@@ -159,10 +160,10 @@ namespace ngs_petsc_interface
 
     self.jac_mat->GetColMap()->NGs2PETSc(*self.col_vec, f);
 
-    // cout << "x: " << x << endl;
+    // cout << endl << "x: " << x << endl;
     // VecView(x, PETSC_VIEWER_STDOUT_WORLD);
 
-    // cout << "F(x): " << endl;
+    // cout << endl << "F(x): " << endl;
     // VecView(f, PETSC_VIEWER_STDOUT_WORLD);
 
     return PetscErrorCode(0);
@@ -184,9 +185,7 @@ namespace ngs_petsc_interface
     if (self.mode != APPLY)
       { self.blf->AssembleLinearization (*self.lin_vec, *self.use_lh, false); }
 
-    cout << "UPDATE VALUES!" << endl;
     self.jac_mat->UpdateValues();
-    cout << "UPDATE VALUES DONE!" << endl;
 
     return PetscErrorCode(0);
   }
