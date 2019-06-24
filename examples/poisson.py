@@ -15,7 +15,7 @@ comm = mpi_world
 
 mesh = Mesh('square.vol', comm)
 comm = MPI_Init()
-V = H1(mesh, order=3, dirichlet='.*')
+V = H1(mesh, order=1, dirichlet='.*')
 u,v = V.TnT()
 a = BilinearForm(V)
 a += SymbolicBFI(grad(u)*grad(v) + u * v)
@@ -23,7 +23,7 @@ f = LinearForm(V)
 f += SymbolicLFI(v)
 f.Assemble()
 gfu = GridFunction(V)
-c = Preconditioner(a, 'bddc')
+#c = Preconditioner(a, 'bddc')
 a.Assemble()
 
 gfo = GridFunction(V)
@@ -42,20 +42,37 @@ petsc.Initialize()
 ex_sol = False
 
 #opts = {"ksp_type":"cg", "ksp_atol":1e-30, "ksp_rtol":1e-8, "pc_type":"ml", "pc_ml_PrintLevel" : "3"}
-opts = {"ksp_type":"cg", "ksp_atol":1e-30, "ksp_rtol":1e-8}
+
+opts = {"ksp_type":"cg", "ksp_atol":1e-30, "ksp_rtol":1e-8, "pc_type":"ml", "pc_ml_PrintLevel" : "3",
+        "pc_mg_cycles" : "1", "pc_ml_maxNlevels" : "10", "pc_mg_log" : ""}
+
+#opts = {"ksp_type":"cg", "ksp_atol":1e-30, "ksp_rtol":1e-8}
+
+opts["ksp_plot_eigenvalues"] = ""
+opts["ksp_compute_eigenvalues"] = ""
+opts["ksp_monitor"] = ""
+opts["ksp_view"] = ""
+opts["pc_mg_view"] = ""
+opts["pc_mg_log"] = ""
 
 mat_wrap = petsc.PETScMatrix(a.mat, freedofs=V.FreeDofs())
 #mat_wrap = petsc.FlatPETScMatrix(a.mat, freedofs=V.FreeDofs())
 ksp = petsc.KSP(mat=mat_wrap, name="someksp", petsc_options=opts, finalize=False)
 
-# import ngs_amg
-# ngs_amg_opts = {"energy" : "alg", "comp_sm" : True, "force_comp_sm" : True, "max_cv" : 500, "ass_frac" : 0.15, "skip_ass" : 3}
-# ngs_pc = ngs_amg.AMG_H1(blf=a, freedofs=V.FreeDofs(), **ngs_amg_opts)
+import ngs_amg
+ngs_amg_opts = {"energy" : "alg", "comp_sm" : True, "force_comp_sm" : True, "max_cv" : 10, "ass_frac" : 0.15, "skip_ass" : 3,
+                "prol_max_per_row" : 10, "prol_min_frac" : 0.01, "smooth_symm" : True, "sp_omega" : 1,
+                "log_level" : 3, "max_levels" : 20}
+ngs_pc = ngs_amg.AMG_H1(blf=a, freedofs=V.FreeDofs(), **ngs_amg_opts)
+if comm.rank == 0:
+    print(' --- NGS AMG LOGS ---')
+    for a, b in ngs_pc.GetLogs().items():
+        print(a, b)
+    print(' --- NGS AMG LOGS ---')
 
-ngs_pc = c
+#ngs_pc = c
 
-ngs_pc = petsc.NGs2PETSc_PC(mat=mat_wrap, pc=ngs_pc)
-
+ngs_pc = petsc.NGs2PETScPrecond(mat=mat_wrap, pc=ngs_pc)
 ksp.SetPC(ngs_pc)
 
 ksp.Finalize()

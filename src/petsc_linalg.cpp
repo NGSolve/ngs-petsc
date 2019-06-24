@@ -162,7 +162,10 @@ namespace ngs_petsc_interface
 	    { cols[n_b_entries++] = row_compress[j]; }
       }
     }
-    MatSeqBAIJSetColumnIndices(petsc_mat, &cols[0]);
+    if (bh == 1)
+      { MatSeqAIJSetColumnIndices(petsc_mat, &cols[0]); }
+    else
+      { MatSeqBAIJSetColumnIndices(petsc_mat, &cols[0]); }
 
     // vals
     size_t len_vals = 0;

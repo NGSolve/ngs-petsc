@@ -20,7 +20,7 @@ namespace ngs_petsc_interface
 
     ~PETScKSP ();
 
-    void SetPC (shared_ptr<PETScPreconditioner> apc);
+    void SetPC (shared_ptr<PETScBasePrecond> apc);
 
     void Finalize ();
 
@@ -35,7 +35,7 @@ namespace ngs_petsc_interface
 
   protected:
     shared_ptr<PETScBaseMatrix> petsc_mat;
-    shared_ptr<PETScPreconditioner> petsc_pc;
+    shared_ptr<PETScBasePrecond> petsc_pc;
     PETScVec petsc_rhs, petsc_sol;
     KSP ksp; bool own_ksp;
   };

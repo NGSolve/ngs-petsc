@@ -9,6 +9,8 @@ namespace ngs_petsc_interface
   using ngs::Range;
 
 
+  using PETScIS = ::IS;
+
   using PETScVec = ::Vec;
 
   using PETScMat = ::Mat;

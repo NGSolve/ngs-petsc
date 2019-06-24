@@ -4,71 +4,100 @@
 namespace ngs_petsc_interface
 {
 
-  /** Can be used on NGSolve- or PETSc-side **/
-  class PETScPreconditioner : public FlatPETScMatrix
+  /** Anything that can be used as a PETSc-Preconditioner **/
+  class PETScBasePrecond
   {
   public:
+    PETScBasePrecond (shared_ptr<PETScBaseMatrix> _petsc_amat = nullptr, shared_ptr<PETScBaseMatrix> _petsc_pmat = nullptr,
+		      string _name = "", FlatArray<string> _petsc_options = Array<string>());
 
-    PETScPreconditioner (shared_ptr<PETScBaseMatrix> mat, shared_ptr<ngs::BaseMatrix> _ngs_pc)
-      : FlatPETScMatrix (_ngs_pc, mat->GetRowSubSet(), mat->GetColSubSet(), mat->GetRowMap(), mat->GetColMap()), petsc_amat(mat)
-    { ; }
+    virtual PETScPC GetPETScPC () const { return petsc_pc; }
+    virtual PETScPC& GetPETScPC () { return petsc_pc; }
 
-    ~PETScPreconditioner () { PCDestroy(&petsc_pc); }
-    
-    virtual PETScPC GetPETScPC () { return petsc_pc; }
+    shared_ptr<PETScBaseMatrix> GetAMat () const { return petsc_amat; }
+    void SetAMat (shared_ptr<PETScBaseMatrix> _petsc_amat) { petsc_amat = _petsc_amat; }
 
-    shared_ptr<PETScBaseMatrix> GetAMat() { return petsc_amat; }
-    
+    shared_ptr<PETScBaseMatrix> GetPMat () const { return petsc_pmat; }
+    void SetPMat (shared_ptr<PETScBaseMatrix> _petsc_pmat) { petsc_pmat = _petsc_pmat; }
+
+    string GetName () const { return name; }
+
+    virtual void Finalize ();
   protected:
-    shared_ptr<PETScBaseMatrix> petsc_amat; // The matrix this is a PC for
     PETScPC petsc_pc;
+    shared_ptr<PETScBaseMatrix> petsc_amat; // the matrix this is a PC for
+    shared_ptr<PETScBaseMatrix> petsc_pmat; // the matrix this PC is built from (usually same as amat)
+    string name;
   };
-  
-  /**
-     An NGSolve-Preconditioner, wrapped to PETSc
-   **/
-  class N2P_Precond : public PETScPreconditioner
+
+
+  /** A PETSc-Preconditioner **/
+  // class PETScPrecond : public PETScBasePrecond
+  // {
+  // public:
+  //   PETScPrecond (shared_ptr<PETScBaseMatrix> _petsc_amat, shared_ptr<PETScBaseMatrix> _petsc_pmat, Array<string> options, string _name = "");
+  // };
+
+
+  /** An NGSolve-BaseMatrix, wrapped to PETSc as a PC **/
+  class NGs2PETScPrecond : public PETScBasePrecond,
+			   public FlatPETScMatrix
   {
   public:
+    NGs2PETScPrecond (shared_ptr<PETScBaseMatrix> _mat, shared_ptr<ngs::BaseMatrix> _ngs_pc,
+		      string name = "", FlatArray<string> _petsc_options = Array<string>(), bool _finalize = true);
 
-    N2P_Precond (shared_ptr<PETScBaseMatrix> mat, shared_ptr<ngs::BaseMatrix> _ngs_pc);
-
+    ~NGs2PETScPrecond () { PCDestroy(&GetPETScPC()); }
+    
     static PetscErrorCode ApplyPC (PETScPC pc, PETScVec x, PETScVec y);
-
-  protected:
   };
 
-  /**
-     A PETSc-Preconditioner, wrapped to NGSolve
-   **/
-  // class P2N_Precond : public PETScPreconditioner
-  // {
-  // public:
-  //   P2N_Precond (PETScMat petsc_mat, string name, Array<string> options);
-  // protected:
-  // };
 
-  // class PETScCompositePC : public PETScPreconditioner
-  // {
-  // public:
-  //   PETScCompositePC (MPI_Comm comm);
-  //   void AddPC (shared_ptr<PETScPreconditioner> componentpc);
-  //   void Finalize ();
-  //   void SetMode (PCCompositeType atype = PC_COMPOSITE_ADDITIVE);
-  // protected:
-  //   Array<shared_ptr<PETScPreconditioner> components;
-  // };
+  class PETScCompositePC : public PETScBasePrecond
+  {
+  public:
+    PETScCompositePC (shared_ptr<PETScBaseMatrix> _petsc_amat = nullptr, shared_ptr<PETScBaseMatrix> _petsc_pmat = nullptr,
+		      string _name = "", FlatArray<string> _petsc_options = Array<string>());
+    void AddPC (shared_ptr<NGs2PETScPrecond> component);
+  protected:
+    Array<shared_ptr<NGs2PETScPrecond>> keep_alive;
+  };
 
-  // class PETScFieldSplitPC : public PETScPreconditioner
-  // {
-  // public:
-  //   PETScFieldSplitPC (shared_ptr<PETScBaseMatrix> amat);
-  //   void AddFieldIndexed (Array<size_t> indices, shared_ptr<PETScPreconditioner> pc, string name = "");
-  //   void AddFieldRange (size_t first, size_t next, shared_ptr<PETScPreconditioner> pc, string name = "");
-  //   // void AddFieldStride (size_t first, size_t step, shared_ptr<PETScPreconditioner> pc, string name = "");
-  //   void Finalize();
-  // protected:
-  // }
+
+  class FSField
+  {
+  public:
+    FSField (shared_ptr<PETScBasePrecond> _pc); // 
+    IS GetIS () const { return is; }
+    shared_ptr<PETScBasePrecond> GetPC () const { return pc; }
+    string GetName () const { return name; }
+  protected:
+    PETScIS is;
+    shared_ptr<PETScBasePrecond> pc;
+    string name;
+  };
+
+
+  class FSFieldRange : public FSField
+  {
+  public:
+    FSFieldRange (shared_ptr<PETScBaseMatrix> _mat, size_t _first, size_t _next);
+    FSFieldRange (shared_ptr<PETScBasePrecond> _pc, size_t _first, size_t _next);
+  protected:
+    void SetUpIS (shared_ptr<PETScBaseMatrix> mat, size_t _first, size_t _next);
+  };
+
+
+  class PETScFieldSplitPC : public PETScBasePrecond
+  {
+  public:
+    PETScFieldSplitPC (shared_ptr<PETScBaseMatrix> amat,
+		       string name = "", FlatArray<string> petsc_options = Array<string>());
+    void AddField (shared_ptr<FSField> field);
+    virtual void Finalize () override;
+  protected:
+    Array<shared_ptr<FSField>> fields;
+  };
   
 } // namespace ngs_petsc_interface
 

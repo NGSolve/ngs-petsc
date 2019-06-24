@@ -84,7 +84,7 @@ namespace ngs_petsc_interface
     }
 
 
-  void PETScKSP :: SetPC (shared_ptr<PETScPreconditioner> apc)
+  void PETScKSP :: SetPC (shared_ptr<PETScBasePrecond> apc)
   {
     petsc_pc = apc;
     KSPSetPC(GetKSP(), petsc_pc->GetPETScPC());
@@ -155,7 +155,7 @@ namespace ngs_petsc_interface
 	   py::arg("petsc_options") = py::dict()
 	   )
       .def("GetMatrix", [](shared_ptr<PETScKSP> & ksp) { return ksp->GetMatrix(); } )
-      .def("SetPC", [](shared_ptr<PETScKSP> & aksp, shared_ptr<PETScPreconditioner> & apc) {
+      .def("SetPC", [](shared_ptr<PETScKSP> & aksp, shared_ptr<PETScBasePrecond> & apc) {
 	  aksp->SetPC(apc);
 	})
       .def("Finalize", [](shared_ptr<PETScKSP> & aksp) { aksp->Finalize(); })
