@@ -23,10 +23,12 @@ namespace ngs_petsc_interface
     string GetName () const { return name; }
 
     virtual void Finalize ();
+
   protected:
     PETScPC petsc_pc;
     shared_ptr<PETScBaseMatrix> petsc_amat; // the matrix this is a PC for
     shared_ptr<PETScBaseMatrix> petsc_pmat; // the matrix this PC is built from (usually same as amat)
+    PETScVec petsc_rhs, petsc_sol;
     string name;
   };
 
@@ -53,7 +55,22 @@ namespace ngs_petsc_interface
   };
 
 
-  class PETScCompositePC : public PETScBasePrecond
+  class PETSc2NGsPrecond : public PETScBasePrecond,
+			   public ngs::BaseMatrix
+  {
+  public:
+    PETSc2NGsPrecond (shared_ptr<PETScBaseMatrix> _petsc_amat = nullptr, shared_ptr<PETScBaseMatrix> _petsc_pmat = nullptr,
+		      string _name = "", FlatArray<string> _petsc_options = Array<string>())
+      : PETScBasePrecond(_petsc_amat, _petsc_pmat, _name, _petsc_options)
+    { PETScBasePrecond::Finalize(); }
+
+    virtual void Mult (const ngs::BaseVector & x, ngs::BaseVector & y) const override;
+    virtual ngs::AutoVector CreateRowVector () const override { return GetAMat()->GetRowMap()->CreateNGsVector(); }
+    virtual ngs::AutoVector CreateColVector () const override { return GetAMat()->GetColMap()->CreateNGsVector(); }
+  };
+
+
+  class PETScCompositePC : public PETSc2NGsPrecond
   {
   public:
     PETScCompositePC (shared_ptr<PETScBaseMatrix> _petsc_amat = nullptr, shared_ptr<PETScBaseMatrix> _petsc_pmat = nullptr,
@@ -88,7 +105,7 @@ namespace ngs_petsc_interface
   };
 
 
-  class PETScFieldSplitPC : public PETScBasePrecond
+  class PETScFieldSplitPC : public PETSc2NGsPrecond
   {
   public:
     PETScFieldSplitPC (shared_ptr<PETScBaseMatrix> amat,

@@ -1,7 +1,7 @@
 from . import libpetscinterface
 
 libpetscinterface.__all__ = ['Initialize', 'Finalize', 'PETScBaseMatrix', 'PETScMatrix',
-                             'FlatPETScMatrix', 'PETScPrecond', 'FieldSplitPrecond',
+                             'FlatPETScMatrix', 'PETScPrecond', 'PETSc2NGsPrecond', 'FieldSplitPrecond',
                              'NGs2PETScPrecond', 'KSP', 'SNES']
 
 from .libpetscinterface import *

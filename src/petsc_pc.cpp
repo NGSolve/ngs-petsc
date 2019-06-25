@@ -24,7 +24,29 @@ namespace ngs_petsc_interface
     PCSetOptionsPrefix(petsc_pc, name.c_str());
 
     SetOptions(_petsc_options, name, NULL);
+
+    petsc_rhs = GetAMat()->GetRowMap()->CreatePETScVector();
+    petsc_sol = GetAMat()->GetColMap()->CreatePETScVector();
   }
+
+
+  void PETSc2NGsPrecond :: Mult (const ngs::BaseVector & x, ngs::BaseVector & y) const
+  {
+    static ngs::Timer tm("PETSc2NGsPrecond::Mult");
+    static ngs::Timer ts("PETSc2NGsPrecond::PCApply");
+    ngs::RegionTimer rts(tm);
+
+    GetAMat()->GetRowMap()->NGs2PETSc(const_cast<ngs::BaseVector&>(x), petsc_rhs);
+
+    {
+      ngs::RegionTimer rts(ts);
+      PCApply (GetPETScPC(), petsc_rhs, petsc_sol);
+    }
+
+    GetAMat()->GetColMap()->PETSc2NGs(y, petsc_sol);
+
+  }
+
 
   void PETScBasePrecond :: Finalize ()
   {
@@ -88,7 +110,7 @@ namespace ngs_petsc_interface
 
   PETScCompositePC :: PETScCompositePC (shared_ptr<PETScBaseMatrix> _petsc_amat, shared_ptr<PETScBaseMatrix> _petsc_pmat,
 					string _name, FlatArray<string> _petsc_options)
-    : PETScBasePrecond (_petsc_amat, _petsc_pmat, _name, _petsc_options)
+    : PETSc2NGsPrecond (_petsc_amat, _petsc_pmat, _name, _petsc_options)
   {
     PCSetType(GetPETScPC(), PCCOMPOSITE);
   }
@@ -146,7 +168,7 @@ namespace ngs_petsc_interface
 
   PETScFieldSplitPC :: PETScFieldSplitPC (shared_ptr<PETScBaseMatrix> _amat,
 					  string _name, FlatArray<string> _petsc_options)
-    : PETScBasePrecond (_amat, _amat, _name, _petsc_options)
+    : PETSc2NGsPrecond (_amat, _amat, _name, _petsc_options)
   {
     PCSetType(GetPETScPC(), PCFIELDSPLIT);
   }
@@ -210,7 +232,17 @@ namespace ngs_petsc_interface
 	       return make_shared<NGs2PETScPrecond>(mat, pc);
 	     }), py::arg("mat"), py::arg("pc"), py::arg("name") = string(""));
 	    
-    py::class_<PETScFieldSplitPC, shared_ptr<PETScFieldSplitPC>, PETScBasePrecond>
+
+    py::class_<PETSc2NGsPrecond, shared_ptr<PETSc2NGsPrecond>, PETScBasePrecond, ngs::BaseMatrix>
+      (m, "PETSc2NGsPrecond", "A Preconditioner built in PETsc")
+      .def (py::init<>
+	    ([](shared_ptr<PETScBaseMatrix> amat, string name, py::dict petsc_options)
+	     {
+	       auto opt_array = Dict2SA(petsc_options);
+	       return make_shared<PETSc2NGsPrecond>(amat, amat, name, opt_array);
+	     }), py::arg("mat"), py::arg("name"), py::arg("petsc_options") = py::dict());
+
+    py::class_<PETScFieldSplitPC, shared_ptr<PETScFieldSplitPC>, PETSc2NGsPrecond>
       (m, "FieldSplitPrecond", "Fieldsplit Preconditioner from PETSc")
       .def (py::init<>
 	    ([](shared_ptr<PETScBaseMatrix> amat, string name, py::dict petsc_options)

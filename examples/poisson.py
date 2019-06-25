@@ -1,13 +1,13 @@
 from ngsolve import *
 import ngs_petsc as petsc
 from netgen.meshing import Mesh as NGMesh
+from time import time
 
 comm = mpi_world
 
 if comm.rank==0:
     from netgen.geom2d import unit_square
     ngm = unit_square.GenerateMesh(maxh=0.01)
-    ngm.Save('squarec.vol')
     ngm.Distribute(comm)
 else:
     ngm = NGMesh.Receive(comm)
@@ -27,13 +27,12 @@ a.Assemble()
 petsc.Initialize()
 
 
-ex_sol = False
 
 #opts = {"ksp_type":"cg", "ksp_atol":1e-30, "ksp_rtol":1e-8, "pc_type":"ml", "pc_ml_PrintLevel" : "3"}
 opts = {"ksp_type":"cg", "ksp_atol":1e-30, "ksp_rtol":1e-8}
 
-mat_wrap = petsc.PETScMatrix(a.mat, freedofs=V.FreeDofs())
-#mat_wrap = petsc.FlatPETScMatrix(a.mat, freedofs=V.FreeDofs())
+#mat_wrap = petsc.PETScMatrix(a.mat, freedofs=V.FreeDofs())
+mat_wrap = petsc.FlatPETScMatrix(a.mat, freedofs=V.FreeDofs())
 ksp = petsc.KSP(mat=mat_wrap, name="someksp", petsc_options=opts, finalize=False)
 
 # import ngs_amg
@@ -42,21 +41,21 @@ ksp = petsc.KSP(mat=mat_wrap, name="someksp", petsc_options=opts, finalize=False
 
 ngs_pc = petsc.NGs2PETScPrecond(mat=mat_wrap, pc=c)
 ksp.SetPC(ngs_pc)
-
 ksp.Finalize()
 
-from time import time
 t = -time()
 gfu.vec.data = ksp * f.vec
 t += time()
 
-# t2 = -time()
-# solvers.CG(mat=a.mat, rhs=f.vec, sol=gfu.vec, pre=ngs_pc, tol=1e-8, printrates=comm.rank==-1)
-# t2 += time()
+mat_convert = petsc.PETScMatrix(a.mat, freedofs=V.FreeDofs())
+gf_one = GridFunction(V)
+gf_one.Set(1)
+mat_convert.SetNearNullSpace([gf_one.vec])
+petsc_pc = petsc.PETSc2NGsPrecond(mat=mat_convert, name="reverse_someksp", petsc_options = {"pc_type" : "gamg"})
+t2 = -time()
+solvers.CG(mat=a.mat, rhs=f.vec, sol=gfu.vec, pre=petsc_pc, tol=1e-8, printrates=comm.rank==0)
+t2 += time()
 
-if comm.rank==0:
-    print('TSOL P', t)
-#    print('TSOL N', t2)
 
 ksp_res = ksp.results
 if comm.rank==0:
@@ -67,8 +66,13 @@ if comm.rank==0:
     print('init. norm res: ', ksp_res['errs'][0])
     print(' fin. norm res: ', ksp_res['res_norm'])
 
+if comm.rank==0:
+    print('TSOL P', t)
+    print('TSOL N', t2)
+
 Draw(gfu, name='sol')
 
+ex_sol = True
 if ex_sol:
     err = f.vec.CreateVector()
     err.data = a.mat.Inverse(V.FreeDofs()) * f.vec - gfu.vec
