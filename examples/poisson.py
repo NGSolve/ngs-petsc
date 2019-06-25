@@ -40,10 +40,7 @@ ksp = petsc.KSP(mat=mat_wrap, name="someksp", petsc_options=opts, finalize=False
 # ngs_amg_opts = {"energy" : "alg", "comp_sm" : True, "force_comp_sm" : True, "max_cv" : 500, "ass_frac" : 0.15, "skip_ass" : 3}
 # ngs_pc = ngs_amg.AMG_H1(blf=a, freedofs=V.FreeDofs(), **ngs_amg_opts)
 
-ngs_pc = c
-
-ngs_pc = petsc.NGs2PETSc_PC(mat=mat_wrap, pc=ngs_pc)
-
+ngs_pc = petsc.NGs2PETScPrecond(mat=mat_wrap, pc=c)
 ksp.SetPC(ngs_pc)
 
 ksp.Finalize()
