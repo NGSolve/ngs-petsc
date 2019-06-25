@@ -424,20 +424,34 @@ namespace ngs_petsc_interface
 
     if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<double>>(mat))
       { SetPETScMat (petsc_mat, spmat, GetRowMap(), GetColMap()) ; }
-    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<Mat<2,2,double>>>(mat))
+#if MAX_SYS_DIM >= 2
+    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<2,2,double>>>(mat))
       { SetPETScMat (petsc_mat, spmat, GetRowMap(), GetColMap()) ; }
-    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<Mat<3,3,double>>>(mat))
+#endif
+#if MAX_SYS_DIM >= 3
+    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<3,3,double>>>(mat))
       { SetPETScMat (petsc_mat, spmat, GetRowMap(), GetColMap()) ; }
-    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<Mat<4,4,double>>>(mat))
+#endif
+#if MAX_SYS_DIM >= 4
+    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<4,4,double>>>(mat))
       { SetPETScMat (petsc_mat, spmat, GetRowMap(), GetColMap()) ; }
-    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<Mat<5,5,double>>>(mat))
+#endif
+#if MAX_SYS_DIM >= 5
+    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<5,5,double>>>(mat))
       { SetPETScMat (petsc_mat, spmat, GetRowMap(), GetColMap()) ; }
-    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<Mat<6,6,double>>>(mat))
+#endif
+#if MAX_SYS_DIM >= 6
+    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<6,6,double>>>(mat))
       { SetPETScMat (petsc_mat, spmat, GetRowMap(), GetColMap()) ; }
-    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<Mat<7,7,double>>>(mat))
+#endif
+#if MAX_SYS_DIM >= 7
+    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<7,7,double>>>(mat))
       { SetPETScMat (petsc_mat, spmat, GetRowMap(), GetColMap()) ; }
-    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<Mat<8,8,double>>>(mat))
+#endif
+#if MAX_SYS_DIM >= 8
+    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<8,8,double>>>(mat))
       { SetPETScMat (petsc_mat, spmat, GetRowMap(), GetColMap()) ; }
+#endif
     else
       { throw Exception("Can not update values for this kind of mat!!");}
   }
