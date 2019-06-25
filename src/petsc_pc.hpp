@@ -67,7 +67,7 @@ namespace ngs_petsc_interface
   class FSField
   {
   public:
-    FSField (shared_ptr<PETScBasePrecond> _pc); // 
+    FSField (shared_ptr<PETScBasePrecond> _pc, string name = ""); // 
     IS GetIS () const { return is; }
     shared_ptr<PETScBasePrecond> GetPC () const { return pc; }
     string GetName () const { return name; }
@@ -81,8 +81,8 @@ namespace ngs_petsc_interface
   class FSFieldRange : public FSField
   {
   public:
-    FSFieldRange (shared_ptr<PETScBaseMatrix> _mat, size_t _first, size_t _next);
-    FSFieldRange (shared_ptr<PETScBasePrecond> _pc, size_t _first, size_t _next);
+    FSFieldRange (shared_ptr<PETScBaseMatrix> _mat, size_t _first, size_t _next, string name = "");
+    FSFieldRange (shared_ptr<PETScBasePrecond> _pc, size_t _first, size_t _next, string name = "");
   protected:
     void SetUpIS (shared_ptr<PETScBaseMatrix> mat, size_t _first, size_t _next);
   };

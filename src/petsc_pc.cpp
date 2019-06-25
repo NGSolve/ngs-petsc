@@ -107,20 +107,20 @@ namespace ngs_petsc_interface
   }
 
 
-  FSField :: FSField (shared_ptr<PETScBasePrecond> _pc)
-    : pc(_pc)
+  FSField :: FSField (shared_ptr<PETScBasePrecond> _pc, string _name)
+    : pc(_pc), name(_name)
   { ; }
 
 
-  FSFieldRange :: FSFieldRange (shared_ptr<PETScBaseMatrix> _mat, size_t _first, size_t _next)
-    : FSField(nullptr)
+  FSFieldRange :: FSFieldRange (shared_ptr<PETScBaseMatrix> _mat, size_t _first, size_t _next, string _name)
+    : FSField(nullptr,  _name)
   {
     SetUpIS(_mat, _first, _next);
   }
 
 
-  FSFieldRange :: FSFieldRange (shared_ptr<PETScBasePrecond> _pc, size_t _first, size_t _next)
-    : FSField(_pc)
+  FSFieldRange :: FSFieldRange (shared_ptr<PETScBasePrecond> _pc, size_t _first, size_t _next, string _name)
+    : FSField(_pc, _name)
   {
     SetUpIS(_pc->GetAMat(), _first, _next);
   }
@@ -149,6 +149,12 @@ namespace ngs_petsc_interface
     : PETScBasePrecond (_amat, _amat, _name, _petsc_options)
   {
     PCSetType(GetPETScPC(), PCFIELDSPLIT);
+  }
+
+
+  void PETScFieldSplitPC :: AddField (shared_ptr<FSField> field)
+  {
+    fields.Append(field);
   }
 
 
@@ -191,6 +197,8 @@ namespace ngs_petsc_interface
 
   void ExportPC (py::module & m)
   {
+    extern Array<string> Dict2SA (py::dict & petsc_options);
+
     py::class_<PETScBasePrecond, shared_ptr<PETScBasePrecond>>
       (m, "PETScPrecond", "not much here...");
 
@@ -202,7 +210,22 @@ namespace ngs_petsc_interface
 	       return make_shared<NGs2PETScPrecond>(mat, pc);
 	     }), py::arg("mat"), py::arg("pc"), py::arg("name") = string(""));
 	    
-    
+    py::class_<PETScFieldSplitPC, shared_ptr<PETScFieldSplitPC>, PETScBasePrecond>
+      (m, "FieldSplitPrecond", "Fieldsplit Preconditioner from PETSc")
+      .def (py::init<>
+	    ([](shared_ptr<PETScBaseMatrix> amat, string name, py::dict petsc_options)
+	     {
+	       auto opt_array = Dict2SA(petsc_options);
+	       return make_shared<PETScFieldSplitPC>(amat, name, opt_array);
+	     }), py::arg("mat"), py::arg("name"), py::arg("petsc_options") = py::dict())
+      .def("AddField", [](shared_ptr<PETScFieldSplitPC> & pc, size_t lower, size_t upper, string name, py::dict petsc_options)
+	   {
+	     auto opt_array = Dict2SA(petsc_options);
+	     pc->AddField(make_shared<FSFieldRange>(pc->GetAMat(), lower, upper, name));
+	   }, py::arg("lower"), py::arg("upper"), py::arg("name") = "", py::arg("petsc_options") = py::dict())
+      .def("Finalize", [](shared_ptr<PETScFieldSplitPC> & pc)
+	   { pc->Finalize(); } );
+
   }
 
 
