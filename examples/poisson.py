@@ -4,17 +4,15 @@ from netgen.meshing import Mesh as NGMesh
 
 comm = mpi_world
 
-# if comm.rank==0:
-#     from netgen.geom2d import unit_square
-#     ngm = unit_square.GenerateMesh(maxh=0.01)
-#     ngm.Save('squarec.vol')
-#     ngm.Distribute(comm)
-# else:
-#     ngm = NGMesh.Receive(comm)
-# mesh = Mesh(ngm)
+if comm.rank==0:
+    from netgen.geom2d import unit_square
+    ngm = unit_square.GenerateMesh(maxh=0.01)
+    ngm.Save('squarec.vol')
+    ngm.Distribute(comm)
+else:
+    ngm = NGMesh.Receive(comm)
+mesh = Mesh(ngm)
 
-mesh = Mesh('square.vol', comm)
-comm = MPI_Init()
 V = H1(mesh, order=3, dirichlet='.*')
 u,v = V.TnT()
 a = BilinearForm(V)
@@ -26,17 +24,7 @@ gfu = GridFunction(V)
 c = Preconditioner(a, 'bddc')
 a.Assemble()
 
-gfo = GridFunction(V)
-gfo.Set(1)
-gfo.vec[:] = 1
-gfx = GridFunction(V)
-gfx.Set(x)
-gfy = GridFunction(V)
-gfy.Set(y)
-
 petsc.Initialize()
-
-#ksp_res = petsc.KSPSolve(mat=a.mat, rhs=f.vec, sol=gfu.vec, kvecs=[gfo.vec], fds=V.FreeDofs(), **opts)
 
 
 ex_sol = False
