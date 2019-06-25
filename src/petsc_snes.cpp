@@ -19,7 +19,7 @@ namespace ngs_petsc_interface
     case(SNES_DIVERGED_INNER          ): return "SNES_DIVERGED_INNER";
     case(SNES_DIVERGED_LOCAL_MIN      ): return "SNES_DIVERGED_LOCAL_MIN";
     case(SNES_DIVERGED_DTOL           ): return "SNES_DIVERGED_DTOL";
-    case(SNES_DIVERGED_JACOBIAN_DOMAIN): return "SNES_DIVERGED_JACOBIAN_DOMAIN";
+    // case(SNES_DIVERGED_JACOBIAN_DOMAIN): return "SNES_DIVERGED_JACOBIAN_DOMAIN";
     case(SNES_CONVERGED_ITERATING     ): return "SNES_CONVERGED_ITERATING";
     default : return "weird, unknown reason";
     }
