@@ -136,7 +136,7 @@ namespace ngs_petsc_interface
     Array<PetscInt> nzepr(nbcol); nzepr = 0;
     nbcol = 0;
     for (auto k : Range(spmat->Height())) {
-      if (!css | css->Test(k)) {
+      if (!css || css->Test(k)) {
 	auto & c = nzepr[nbcol++];
 	for (auto j : spmat->GetRowIndices(k))
 	  if (!rss || rss->Test(j))
