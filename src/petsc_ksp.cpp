@@ -80,7 +80,7 @@ namespace ngs_petsc_interface
       petsc_pc = nullptr;
       petsc_mat = nullptr;
       if (own_ksp)
-	{ KSPDestroy(&ksp); }
+	{ /* KSPDestroy(&ksp); */ }
     }
 
 

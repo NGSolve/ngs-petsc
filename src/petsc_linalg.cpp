@@ -304,7 +304,7 @@ namespace ngs_petsc_interface
   NGs2PETScVecMap :: ~NGs2PETScVecMap ()
   {
     if (IsParallel())
-      { ISLocalToGlobalMappingDestroy(&is_map); }
+      { /* ISLocalToGlobalMappingDestroy(&is_map); */ }
   }
 
 
@@ -555,7 +555,7 @@ namespace ngs_petsc_interface
       { comm = PETSC_COMM_SELF; }
     MatNullSpace ns; MatNullSpaceCreate(comm, const_kernel ? PETSC_TRUE : PETSC_FALSE, vecs.Size(), &petsc_vecs[0], &ns);
     for (auto v : petsc_vecs) // destroy vecs (reduces reference count by 1)
-      { VecDestroy(&v); }
+      { /* VecDestroy(&v); */ }
     return ns;
   } // NullSpaceCreate
 
