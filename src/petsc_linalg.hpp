@@ -58,7 +58,7 @@ namespace ngs_petsc_interface
       : row_map(_row_map), col_map(_col_map), ngs_mat(_ngs_mat), row_subset(_row_subset), col_subset(_col_subset)
     { ; }
 
-    ~PETScBaseMatrix () { MatDestroy(&petsc_mat); }
+    ~PETScBaseMatrix () { /* MatDestroy(&petsc_mat); */ }
 
     /** Call this if the NGSolve-Matrix has changed and you want to get the new values to PETSc **/
     virtual void UpdateValues () { ; }

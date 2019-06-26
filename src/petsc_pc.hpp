@@ -49,7 +49,7 @@ namespace ngs_petsc_interface
     NGs2PETScPrecond (shared_ptr<PETScBaseMatrix> _mat, shared_ptr<ngs::BaseMatrix> _ngs_pc,
 		      string name = "", FlatArray<string> _petsc_options = Array<string>(), bool _finalize = true);
 
-    ~NGs2PETScPrecond () { PCDestroy(&GetPETScPC()); }
+    ~NGs2PETScPrecond () { /* PCDestroy(&GetPETScPC()); */ }
     
     static PetscErrorCode ApplyPC (PETScPC pc, PETScVec x, PETScVec y);
   };

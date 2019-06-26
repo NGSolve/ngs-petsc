@@ -108,8 +108,8 @@ namespace ngs_petsc_interface
 
   PETScSNES :: ~PETScSNES ()
   {
-    SNESDestroy(&GetSNES());
-    VecDestroy(&func_vec);
+    // SNESDestroy(&GetSNES());
+    // VecDestroy(&func_vec);
   }
 
 
