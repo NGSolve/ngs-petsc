@@ -72,7 +72,7 @@ namespace ngs_petsc_interface
       if (mode == FLAT)
 	{ jac_mat = make_shared<FlatPETScMatrix> (blf->GetMatrixPtr(), row_fds, col_fds, row_map, col_map); }
       else if (mode == CONVERT) // IS makes UpdateValues easier
-	{ jac_mat = make_shared<PETScMatrix> (blf->GetMatrixPtr(), row_fds, col_fds, MATMPIBAIJ, row_map, col_map); }
+	{ jac_mat = make_shared<PETScMatrix> (blf->GetMatrixPtr(), row_fds, col_fds, row_map, col_map); }
     }
 
     // buffer vectors

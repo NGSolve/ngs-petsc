@@ -107,15 +107,22 @@ namespace ngs_petsc_interface
   class PETScMatrix : public PETScBaseMatrix
   {
   public:
+    enum MAT_TYPE : char { AIJ = 0,      // Sparse Matrix (either MATSEQAIJ or MATMPIAIJ)
+			   BAIJ = 1,     // Sparse Block-Matrix (either MATSEQAIJ or MATMPIBAIJ)
+			   IS_AIJ = 2,   // Sub-Assembled diagonal blocks, local mats in sparse format
+			   IS_BAIJ = 3}; // Sub-Assembled diagonal blocks, local mats in sparse block-format
     PETScMatrix (shared_ptr<ngs::BaseMatrix> _ngs_mat, shared_ptr<ngs::BitArray> _row_subset,
 		 shared_ptr<ngs::BitArray> _col_subset, shared_ptr<NGs2PETScVecMap> _row_map = nullptr,
 		 shared_ptr<NGs2PETScVecMap> _col_map = nullptr);
 
     PETScMatrix (shared_ptr<ngs::BaseMatrix> _ngs_mat, shared_ptr<ngs::BitArray> _row_subset,
-		 shared_ptr<ngs::BitArray> _col_subset, PETScMatType _petsc_mat_type,
+		 shared_ptr<ngs::BitArray> _col_subset, MAT_TYPE _petsc_mat_type,
 		 shared_ptr<NGs2PETScVecMap> _row_map = nullptr, shared_ptr<NGs2PETScVecMap> _col_map = nullptr);
 
     virtual void UpdateValues ();
+
+  protected:
+    void ConvertMat (); // For a parallel matrix, converts to MATIS, else to SEQAIJ or SEQBAIJ
   };
 
 

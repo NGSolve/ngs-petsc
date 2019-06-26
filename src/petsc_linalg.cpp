@@ -33,6 +33,8 @@ namespace ngs_petsc_interface
       { col_compress[k] = (!css || css->Test(k)) ? nbcol++ : -1; }
     int nrows = nbcol * bh;
 
+    bool symmetric = dynamic_pointer_cast<ngs::SparseMatrixSymmetric<TM>>(spmat) != nullptr;
+
     size_t len_vals = 0;
     for (auto k : Range(spmat->Height())) {
       PetscInt ck = col_compress[k];
@@ -44,6 +46,8 @@ namespace ngs_petsc_interface
 	  if (cj != -1) {
 	    PetscScalar* data = get_ptr(rvs[j]);
 	    MatSetValuesBlocked(petsc_mat, 1, &ck, 1, &cj, data, INSERT_VALUES);
+	    if (symmetric)
+	      { MatSetValuesBlocked(petsc_mat, 1, &cj, 1, &ck, data, INSERT_VALUES); }
 	  }
 	}
       }
@@ -61,6 +65,7 @@ namespace ngs_petsc_interface
     PETScMat local_mat; MatISGetLocalMat(petsc_mat, &local_mat);
     SetPETScMatSeq (local_mat, spmat, rss, css);
   } // SetPETScMatPar
+
 
   template<class TM>
   void SetPETScMatPar (PETScMat petsc_mat, shared_ptr<ngs::SparseMatrixTM<TM>> spmat, shared_ptr<NGs2PETScVecMap> row_map, shared_ptr<NGs2PETScVecMap> col_map)
@@ -96,6 +101,7 @@ namespace ngs_petsc_interface
     MatAssemblyEnd(petsc_mat, MAT_FINAL_ASSEMBLY);
   } // SetPETScMatPar
 
+
   template<class TM>
   void SetPETScMat (PETScMat petsc_mat, shared_ptr<ngs::SparseMatrixTM<TM>> spmat, shared_ptr<NGs2PETScVecMap> row_map, shared_ptr<NGs2PETScVecMap> col_map)
   {
@@ -111,10 +117,101 @@ namespace ngs_petsc_interface
   }
 
   template<class TM>
+  PETScMat CreatePETScMatSeqBAIJFromSymmetric (shared_ptr<ngs::SparseMatrixSymmetric<TM>> spmat, shared_ptr<ngs::BitArray> rss, shared_ptr<ngs::BitArray> css)
+  {
+    // row map (map for a row)
+    PetscInt bw = ngs::mat_traits<TM>::WIDTH;
+    int nbrow = 0;
+    Array<int> row_compress(spmat->Width());
+    for (auto k : Range(spmat->Width()))
+      { row_compress[k] = (!rss || rss->Test(k)) ? nbrow++ : -1; }
+    int ncols = nbrow * bw;
+
+    // col map (map for a col)
+    PetscInt bh = ngs::mat_traits<TM>::HEIGHT;
+    int nbcol = 0;
+    Array<int> col_compress(spmat->Height());
+    for (auto k : Range(spmat->Height()))
+      { col_compress[k] = (!css || css->Test(k)) ? nbcol++ : -1; }
+    int nrows = nbcol * bh;
+
+    // allocate mat
+    Array<PetscInt> nzepr(nbcol+1); nzepr = 0;
+    for (auto k : Range(spmat->Height())) {
+      auto ck = col_compress[k];
+      if (ck != -1) {
+	for (auto j : spmat->GetRowIndices(k)) {
+	  auto cj = row_compress[j];
+	  if (cj != -1)
+	    { nzepr[ck+1]++; if (cj != ck) { nzepr[cj+1]++; } }
+	}
+      }
+    }
+    PETScMat petsc_mat;
+    if (bh == 1)
+      { MatCreateSeqAIJ(PETSC_COMM_SELF, nrows, ncols, -1, &nzepr[1], &petsc_mat); }
+    else
+      { MatCreateSeqBAIJ(PETSC_COMM_SELF, bh, nrows, ncols, -1, &nzepr[1], &petsc_mat); }
+
+    // cols
+    for (auto k : Range(1, nbcol+1))
+      { nzepr[k] += nzepr[k-1]; }
+    Array<int> cnt(nbcol); cnt = 0;
+    Array<PetscInt> cols(nzepr.Last());
+    for (auto k : Range(spmat->Height())) {
+      auto ck = col_compress[k];
+      if (ck != -1) {
+	for (auto j : spmat->GetRowIndices(k)) {
+	  auto cj = row_compress[j];
+	  if (cj != -1) {
+	    cols[nzepr[ck] + cnt[ck]++] = cj;
+	    if (cj != ck)
+	      { cols[nzepr[cj] + cnt[cj]++] = ck; }
+	  }
+	}
+      }
+    }
+    if (bh == 1)
+      { MatSeqAIJSetColumnIndices(petsc_mat, &cols[0]); }
+    else
+      { MatSeqBAIJSetColumnIndices(petsc_mat, &cols[0]); }
+
+    // vals
+    for (auto k : Range(spmat->Height())) {
+      auto ck = col_compress[k];
+      if (ck != -1) {
+	auto ris = spmat->GetRowIndices(k);
+	auto rvs = spmat->GetRowValues(k);
+	for (auto j : Range(ris.Size())) {
+	  auto cj = row_compress[ris[j]];
+	  if (cj != -1) {
+	    PetscScalar* data = get_ptr(rvs[j]);
+	    cout << "set sym vals " << ck << " " << cj << endl;
+	    MatSetValuesBlocked(petsc_mat, 1, &ck, 1, &cj, data, INSERT_VALUES);
+	    if (cj != ck)
+	      { MatSetValuesBlocked(petsc_mat, 1, &cj, 1, &ck, data, INSERT_VALUES); }
+	  }
+	}
+      }
+    }
+    MatAssemblyBegin(petsc_mat, MAT_FINAL_ASSEMBLY);
+    MatAssemblyEnd(petsc_mat, MAT_FINAL_ASSEMBLY);
+
+    // cout << "SYMM SPMAT: " << endl << *spmat << endl;
+    // cout << "SYMM-TO-FULL PETSC BLOCK-MAT: " << endl;
+    // MatView(petsc_mat, PETSC_VIEWER_STDOUT_SELF);
+    return petsc_mat;
+  } // CreatePETScMatSeqBAIJFromSymmetric
+
+
+  template<class TM>
   PETScMat CreatePETScMatSeqBAIJ (shared_ptr<ngs::SparseMatrixTM<TM>> spmat, shared_ptr<ngs::BitArray> rss, shared_ptr<ngs::BitArray> css)
   {
 
     static_assert(ngs::mat_traits<TM>::WIDTH == ngs::mat_traits<TM>::HEIGHT, "PETSc can only handle square block entries!");
+
+    if (auto sym_spm = dynamic_pointer_cast<ngs::SparseMatrixSymmetric<TM>>(spmat))
+      { return CreatePETScMatSeqBAIJFromSymmetric (sym_spm, rss, css); }
 
     // row map (map for a row)
     PetscInt bw = ngs::mat_traits<TM>::WIDTH;
@@ -123,7 +220,7 @@ namespace ngs_petsc_interface
     for (auto k : Range(spmat->Width()))
       { row_compress[k] = (!rss || rss->Test(k)) ? nbrow++ : -1; }
     int ncols = nbrow * bw;
-    
+
     // col map (map for a col)
     PetscInt bh = ngs::mat_traits<TM>::HEIGHT;
     int nbcol = 0;
@@ -371,6 +468,89 @@ namespace ngs_petsc_interface
 			      shared_ptr<NGs2PETScVecMap> _col_map)
     : PETScBaseMatrix(_ngs_mat, _row_subset, _col_subset, _row_map, _col_map)
   {
+    ConvertMat();
+
+    /**
+       No matrix format specified, so we pick a format for the parallel matrix that fits the local matrix.
+         SEQAIJ - MPIAIJ
+         SEQBAIJ - MPIBAIJ
+       If not parallel, nothing to do.
+     **/
+    PETScMatType pmt, mt;
+    MatGetType(petsc_mat, &pmt);
+    if (string(pmt) == string(MATIS)) {
+      // get the format of the local matrix
+      PETScMat loc_mat;
+      MatISGetLocalMat(petsc_mat, &loc_mat);
+      MatGetType(loc_mat, &mt);
+      MatISRestoreLocalMat(petsc_mat, &loc_mat);
+      // convert the parallel matrix
+      pmt = (mt == MATSEQAIJ) ? MATMPIAIJ : MATMPIBAIJ;
+      MatConvert(petsc_mat, pmt, MAT_INPLACE_MATRIX, &petsc_mat);
+    }
+
+  }
+
+
+  PETScMatrix :: PETScMatrix (shared_ptr<ngs::BaseMatrix> _ngs_mat, shared_ptr<ngs::BitArray> _row_subset,
+			      shared_ptr<ngs::BitArray> _col_subset, PETScMatrix::MAT_TYPE _petsc_mat_type,
+			      shared_ptr<NGs2PETScVecMap> _row_map, shared_ptr<NGs2PETScVecMap> _col_map)
+    : PETScBaseMatrix (_ngs_mat, _row_subset, _col_subset, _row_map, _col_map)
+  {
+
+    ConvertMat();
+
+    /**
+       Matrix format is specified.
+          AIJ -> SEQAIJ/MPIAIJ
+	  BAIJ -> SEQBAIJ/MPIBAIJ
+	  IS_AIJ -> local mat to AIJ
+	  IS_BAIJ -> local mat to BAIJ
+     **/
+
+    PETScMatType pmt;
+    MatGetType(petsc_mat, &pmt);
+    if (string(pmt) == string(MATIS)) {
+      PETScMat loc_mat;
+      PETScMatType loc_mt;
+      MatISGetLocalMat(petsc_mat, &loc_mat);
+      MatGetType(loc_mat, &loc_mt);
+      switch(_petsc_mat_type) {
+      case AIJ : {
+	MatISRestoreLocalMat(petsc_mat, &loc_mat);
+	MatConvert(petsc_mat, MATMPIAIJ, MAT_INPLACE_MATRIX, &petsc_mat);
+	break;
+      }
+      case BAIJ : {
+	MatISRestoreLocalMat(petsc_mat, &loc_mat);
+	MatConvert(petsc_mat, MATMPIBAIJ, MAT_INPLACE_MATRIX, &petsc_mat);
+	break;
+      }
+      case IS_AIJ  : {
+	if (loc_mt != MATSEQAIJ)
+	  { MatConvert(loc_mat, MATSEQAIJ, MAT_INPLACE_MATRIX, &petsc_mat); }
+	MatISRestoreLocalMat(petsc_mat, &loc_mat);
+	break;
+      }
+      case IS_BAIJ : {
+	if (loc_mt != MATSEQBAIJ)
+	  { MatConvert(loc_mat, MATSEQBAIJ, MAT_INPLACE_MATRIX, &petsc_mat); }
+	MatISRestoreLocalMat(petsc_mat, &loc_mat);
+	break;
+      }
+      default: break;
+      }
+    }
+    else {
+      PETScMatType mt = (_petsc_mat_type == AIJ || _petsc_mat_type == IS_AIJ) ? MATSEQAIJ : MATSEQBAIJ;
+      if (pmt != mt)
+	{ MatConvert(petsc_mat, mt, MAT_INPLACE_MATRIX, &petsc_mat); }
+    }
+  } // PETScMatrix (..)
+
+
+  void PETScMatrix :: ConvertMat ()
+  {
     auto parmat = dynamic_pointer_cast<ngs::ParallelMatrix>(ngs_mat);
 
     bool parallel = parmat != nullptr;
@@ -398,22 +578,7 @@ namespace ngs_petsc_interface
     // parallel PETSc matrix
     petsc_mat = parallel ? CreatePETScMatIS (petsc_mat_loc, row_map, col_map) : petsc_mat_loc;
 
-
-  } // PETScMatrix (..)
-
-
-  PETScMatrix :: PETScMatrix (shared_ptr<ngs::BaseMatrix> _ngs_mat, shared_ptr<ngs::BitArray> _row_subset,
-			      shared_ptr<ngs::BitArray> _col_subset, PETScMatType _petsc_mat_type,
-			      shared_ptr<NGs2PETScVecMap> _row_map, shared_ptr<NGs2PETScVecMap> _col_map)
-    : PETScMatrix (_ngs_mat, _row_subset, _col_subset, _row_map, _col_map)
-  {
-    MatType pmt; MatGetType(petsc_mat, &pmt);
-    if (pmt != _petsc_mat_type)
-      {
-	// MatSetBlockSize(petsc_mat, row_pardofs->GetEntrySize());
-	MatConvert(petsc_mat, _petsc_mat_type, MAT_INPLACE_MATRIX, &petsc_mat);
-      }
-  } // PETScMatrix (..)
+  } // PETScMatrix::ConvertMat()
 
 
   void PETScMatrix :: UpdateValues ()
@@ -575,22 +740,45 @@ namespace ngs_petsc_interface
 	}, py::arg("kvecs"));
     
 
-    py::class_<PETScMatrix, shared_ptr<PETScMatrix>, PETScBaseMatrix>
-      (m, "PETScMatrix", "PETSc matrix, converted from an NGSolve-matrix")
-      .def(py::init<>
-	   ([] (shared_ptr<ngs::BaseMatrix> mat, shared_ptr<ngs::BitArray> freedofs)
-	    {
-	      return make_shared<PETScMatrix> (mat, freedofs, freedofs, MATMPIAIJ);
-	    }), py::arg("ngs_mat"), py::arg("freedofs") = nullptr);
-		
+    auto pcm = py::class_<PETScMatrix, shared_ptr<PETScMatrix>, PETScBaseMatrix>
+      (m, "PETScMatrix", "PETSc matrix, converted from an NGSolve-matrix");
+
+    py::enum_<PETScMatrix::MAT_TYPE>
+      (pcm, "MAT_TYPE", docu_string(R"raw_string(
+The format to use for the PETSc matrix.
+AIJ     .. (parallel) sparse matrix
+BAIJ    .. (parallel) sparse block matrix
+IS_AIJ  .. sub-assembled diagonal blocks, blocks in sparse matrix format (same as AIJ if not parallel)
+IS_BAOJ .. sub-assembled diagonal blocks, blocks in sparse block matrix format (same as BAIJ if not parallel) )raw_string"))
+      .value("AIJ"    , PETScMatrix::MAT_TYPE::AIJ)
+      .value("BAIJ"   , PETScMatrix::MAT_TYPE::BAIJ)
+      .value("IS_AIJ" , PETScMatrix::MAT_TYPE::IS_AIJ)
+      .value("IS_BAIJ", PETScMatrix::MAT_TYPE::IS_BAIJ)
+      .export_values()
+      ;
+
+    pcm.def(py::init<>
+	    ([] (shared_ptr<ngs::BaseMatrix> mat, shared_ptr<ngs::BitArray> freedofs,
+		 shared_ptr<ngs::BitArray> row_freedofs, shared_ptr<ngs::BitArray> col_freedofs,
+		 py::object format)
+	     {
+	       if (format.is(py::none()))
+		 { return make_shared<PETScMatrix> (mat, freedofs ? freedofs : row_freedofs, freedofs ? freedofs : col_freedofs); }
+	       else
+		 { return make_shared<PETScMatrix> (mat, freedofs ? freedofs : row_freedofs, freedofs ? freedofs : col_freedofs,
+						    format.cast<PETScMatrix::MAT_TYPE>()); }
+	     }), py::arg("ngs_mat"), py::arg("freedofs") = nullptr, py::arg("row_freedofs") = nullptr, py::arg("col_freedofs") = nullptr,
+	    py::arg("formar") = py::none());
+
 
     py::class_<FlatPETScMatrix, shared_ptr<FlatPETScMatrix>, PETScBaseMatrix>
       (m, "FlatPETScMatrix", "A wrapper around an NGSolve-matrix")
       .def(py::init<>
-	   ([] (shared_ptr<ngs::BaseMatrix> mat, shared_ptr<ngs::BitArray> freedofs)
+	   ([] (shared_ptr<ngs::BaseMatrix> mat, shared_ptr<ngs::BitArray> freedofs,
+		shared_ptr<ngs::BitArray> row_freedofs, shared_ptr<ngs::BitArray> col_freedofs )
 	    {
-	      return make_shared<FlatPETScMatrix> (mat, freedofs, freedofs);
-	    }), py::arg("ngs_mat"), py::arg("freedofs") = nullptr);
+	      return make_shared<FlatPETScMatrix> (mat, freedofs ? freedofs : row_freedofs, freedofs ? freedofs : col_freedofs);
+	    }), py::arg("ngs_mat"), py::arg("freedofs") = nullptr, py::arg("row_freedofs") = nullptr, py::arg("col_freedofs") = nullptr);
 
   }
 
