@@ -768,7 +768,7 @@ IS_BAOJ .. sub-assembled diagonal blocks, blocks in sparse block matrix format (
 		 { return make_shared<PETScMatrix> (mat, freedofs ? freedofs : row_freedofs, freedofs ? freedofs : col_freedofs,
 						    format.cast<PETScMatrix::MAT_TYPE>()); }
 	     }), py::arg("ngs_mat"), py::arg("freedofs") = nullptr, py::arg("row_freedofs") = nullptr, py::arg("col_freedofs") = nullptr,
-	    py::arg("formar") = py::none());
+	    py::arg("format") = py::none());
 
 
     py::class_<FlatPETScMatrix, shared_ptr<FlatPETScMatrix>, PETScBaseMatrix>
