@@ -485,7 +485,7 @@ namespace ngs_petsc_interface
       MatGetType(loc_mat, &mt);
       MatISRestoreLocalMat(petsc_mat, &loc_mat);
       // convert the parallel matrix
-      pmt = (mt == MATSEQAIJ) ? MATMPIAIJ : MATMPIBAIJ;
+      pmt = (mt == string(MATSEQAIJ)) ? MATMPIAIJ : MATMPIBAIJ;
       MatConvert(petsc_mat, pmt, MAT_INPLACE_MATRIX, &petsc_mat);
     }
 
@@ -527,13 +527,13 @@ namespace ngs_petsc_interface
 	break;
       }
       case IS_AIJ  : {
-	if (loc_mt != MATSEQAIJ)
+	if (loc_mt != string(MATSEQAIJ))
 	  { MatConvert(loc_mat, MATSEQAIJ, MAT_INPLACE_MATRIX, &petsc_mat); }
 	MatISRestoreLocalMat(petsc_mat, &loc_mat);
 	break;
       }
       case IS_BAIJ : {
-	if (loc_mt != MATSEQBAIJ)
+	if (loc_mt != string(MATSEQBAIJ))
 	  { MatConvert(loc_mat, MATSEQBAIJ, MAT_INPLACE_MATRIX, &petsc_mat); }
 	MatISRestoreLocalMat(petsc_mat, &loc_mat);
 	break;
