@@ -5,6 +5,17 @@ namespace ngs_petsc_interface
 {
 
 
+  PETScBasePrecond :: PETScBasePrecond (MPI_Comm comm, string _name, FlatArray<string> _petsc_options)
+  {
+    PCCreate(comm, &petsc_pc);
+
+    name = (_name.size()) ? name : GetDefaultId();
+    PCSetOptionsPrefix(petsc_pc, name.c_str());
+
+    SetOptions(_petsc_options, name, NULL);
+ }
+
+
   PETScBasePrecond :: PETScBasePrecond (shared_ptr<PETScBaseMatrix> _petsc_amat, shared_ptr<PETScBaseMatrix> _petsc_pmat,
 					string _name, FlatArray<string> _petsc_options)
     : petsc_amat(_petsc_amat), petsc_pmat(_petsc_pmat), name(_name)
@@ -30,6 +41,56 @@ namespace ngs_petsc_interface
   }
 
 
+  void PETScBasePrecond :: Finalize ()
+  {
+    if (petsc_amat != nullptr) {
+      if (petsc_pmat != nullptr)
+	{ PCSetOperators(petsc_pc, petsc_amat->GetPETScMat(), petsc_pmat->GetPETScMat()); }
+      else
+	{ PCSetOperators(petsc_pc, petsc_amat->GetPETScMat(), petsc_amat->GetPETScMat()); }
+    }
+
+    PCSetFromOptions(petsc_pc);
+
+    PCSetUp(petsc_pc);
+  }
+
+
+  PETSc2NGsPrecond :: PETSc2NGsPrecond (shared_ptr<ngs::BilinearForm> bfa, const ngs::Flags & aflags,
+					const string aname)
+    : PETScBasePrecond(bfa->GetFESpace()->IsParallel() ? MPI_Comm(bfa->GetFESpace()->GetParallelDofs()->GetCommunicator()) : PETSC_COMM_SELF, aname),
+      ngs::Preconditioner (bfa, aflags, aname)
+  {
+    auto & petsc_options = flags.GetStringListFlag("petsc_pc_petsc_options");
+    SetOptions(petsc_options, PETScBasePrecond::GetName(), NULL);
+  }
+
+
+  PETSc2NGsPrecond :: PETSc2NGsPrecond (const ngs::PDE & apde, const ngs::Flags & aflags, const string aname)
+    : PETScBasePrecond(MPI_COMM_NULL, ""), ngs::Preconditioner( &apde, aflags, aname)
+  { throw Exception("Not implemented! (Who still uses PDE files?)"); }
+
+
+  ngs::RegisterPreconditioner<PETSc2NGsPrecond> registerPETSc2NGsPrecond("petsc_pc");
+
+
+  void PETSc2NGsPrecond :: InitLevel (shared_ptr<ngs::BitArray> freedofs)
+  {
+    subset = freedofs;
+  }
+
+
+  void PETSc2NGsPrecond :: FinalizeLevel (const ngs::BaseMatrix * mat)
+  {
+    petsc_pmat = petsc_amat = make_shared<PETScMatrix>(shared_ptr<BaseMatrix>(const_cast<BaseMatrix*>(mat), NOOP_Deleter), subset, subset);
+
+    petsc_rhs = GetAMat()->GetRowMap()->CreatePETScVector();
+    petsc_sol = GetAMat()->GetColMap()->CreatePETScVector();
+
+    Finalize();
+  }
+
+
   void PETSc2NGsPrecond :: Mult (const ngs::BaseVector & x, ngs::BaseVector & y) const
   {
     static ngs::Timer tm("PETSc2NGsPrecond::Mult");
@@ -45,21 +106,6 @@ namespace ngs_petsc_interface
 
     GetAMat()->GetColMap()->PETSc2NGs(y, petsc_sol);
 
-  }
-
-
-  void PETScBasePrecond :: Finalize ()
-  {
-    if (petsc_amat != nullptr) {
-      if (petsc_pmat != nullptr)
-	{ PCSetOperators(petsc_pc, petsc_amat->GetPETScMat(), petsc_pmat->GetPETScMat()); }
-      else
-	{ PCSetOperators(petsc_pc, petsc_amat->GetPETScMat(), petsc_amat->GetPETScMat()); }
-    }
-
-    PCSetFromOptions(petsc_pc);
-
-    PCSetUp(petsc_pc);
   }
 
 
@@ -232,7 +278,6 @@ namespace ngs_petsc_interface
 	       return make_shared<NGs2PETScPrecond>(mat, pc);
 	     }), py::arg("mat"), py::arg("pc"), py::arg("name") = string(""));
 	    
-
     py::class_<PETSc2NGsPrecond, shared_ptr<PETSc2NGsPrecond>, PETScBasePrecond, ngs::BaseMatrix>
       (m, "PETSc2NGsPrecond", "A Preconditioner built in PETsc")
       .def (py::init<>
@@ -249,7 +294,7 @@ namespace ngs_petsc_interface
 	     {
 	       auto opt_array = Dict2SA(petsc_options);
 	       return make_shared<PETScFieldSplitPC>(amat, name, opt_array);
-	     }), py::arg("mat"), py::arg("name"), py::arg("petsc_options") = py::dict())
+	     }), py::arg("mat"), py::arg("name") = "", py::arg("petsc_options") = py::dict())
       .def("AddField", [](shared_ptr<PETScFieldSplitPC> & pc, size_t lower, size_t upper, string name, py::dict petsc_options)
 	   {
 	     auto opt_array = Dict2SA(petsc_options);
@@ -257,7 +302,6 @@ namespace ngs_petsc_interface
 	   }, py::arg("lower"), py::arg("upper"), py::arg("name") = "", py::arg("petsc_options") = py::dict())
       .def("Finalize", [](shared_ptr<PETScFieldSplitPC> & pc)
 	   { pc->Finalize(); } );
-
   }
 
 
