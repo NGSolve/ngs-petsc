@@ -17,6 +17,8 @@ namespace ngs_petsc_interface
   using PETScMatType = ::MatType;
 
   using PETScPC = ::PC;
+  using PETScPCType = ::PCType;
+
 } // namespace ngs_petsc_interface
 
 #endif
