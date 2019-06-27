@@ -29,9 +29,16 @@ namespace ngs_petsc_interface
     INLINE KSP GetKSP () const { return ksp; }
     
     virtual void Mult (const ngs::BaseVector & x, ngs::BaseVector & y) const override;
+    virtual void MultTransAdd (double val, const ngs::BaseVector & x, ngs::BaseVector & y) const override
+    { y = 0; Mult(x,y); y *= val; }
+    virtual void MultTransAdd (Complex val, const ngs::BaseVector & x, ngs::BaseVector & y) const override
+    { y = 0; Mult(x,y); y *= val; }
 
     virtual ngs::AutoVector CreateRowVector () const override { return GetMatrix()->GetRowMap()->CreateNGsVector(); }
     virtual ngs::AutoVector CreateColVector () const override { return GetMatrix()->GetColMap()->CreateNGsVector(); }
+
+    virtual int VHeight () const override { return GetMatrix()->GetNGsMat()->VHeight(); }
+    virtual int VWidth () const override { return GetMatrix()->GetNGsMat()->VWidth(); }
 
   protected:
     shared_ptr<PETScBaseMatrix> petsc_mat;
