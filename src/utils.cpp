@@ -69,8 +69,8 @@ namespace ngs_petsc_interface
 	InitializePETSc(prog_name, opts);
       }, py::arg("prog_name") = string("NGsPETScInterface"));
 
+
     m.def("Finalize", [&]() {
-	cout << "FINALIZE PETSC!!" << endl;
 	FinalizePETSc();
       });
 

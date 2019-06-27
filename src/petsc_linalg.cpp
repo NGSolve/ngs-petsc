@@ -749,7 +749,7 @@ The format to use for the PETSc matrix.
 AIJ     .. (parallel) sparse matrix
 BAIJ    .. (parallel) sparse block matrix
 IS_AIJ  .. sub-assembled diagonal blocks, blocks in sparse matrix format (same as AIJ if not parallel)
-IS_BAOJ .. sub-assembled diagonal blocks, blocks in sparse block matrix format (same as BAIJ if not parallel) )raw_string"))
+IS_BAIJ .. sub-assembled diagonal blocks, blocks in sparse block matrix format (same as BAIJ if not parallel) )raw_string"))
       .value("AIJ"    , PETScMatrix::MAT_TYPE::AIJ)
       .value("BAIJ"   , PETScMatrix::MAT_TYPE::BAIJ)
       .value("IS_AIJ" , PETScMatrix::MAT_TYPE::IS_AIJ)
