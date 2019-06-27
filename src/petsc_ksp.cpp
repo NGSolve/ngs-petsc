@@ -24,7 +24,7 @@ namespace ngs_petsc_interface
       case(KSP_DIVERGED_INDEFINITE_PC   ): return "KSP_DIVERGED_INDEFINITE_PC   ";
       case(KSP_DIVERGED_NANORINF        ): return "KSP_DIVERGED_NANORINF        ";
       case(KSP_DIVERGED_INDEFINITE_MAT  ): return "KSP_DIVERGED_INDEFINITE_MAT  ";
-      case(KSP_DIVERGED_PC_FAILED       ): return "KSP_DIVERGED_PC_FAILED       "; // NEW
+      // case(KSP_DIVERGED_PC_FAILED       ): return "KSP_DIVERGED_PC_FAILED       "; // NEW
       // case(KSP_DIVERGED_PCSETUP_FAILED  ): return "KSP_DIVERGED_PCSETUP_FAILED  "; // OLD
       case(KSP_CONVERGED_ITERATING      ): return "KSP_CONVERGED_ITERATING      ";
       default:  return "unknown reason??";
@@ -155,6 +155,23 @@ namespace ngs_petsc_interface
 	   py::arg("mat"), py::arg("name") = string(""), py::arg("finalize") = true,
 	   py::arg("petsc_options") = py::dict()
 	   )
+      .def("AttachHypreData", [](shared_ptr<PETScKSP> & ksp, shared_ptr<PETScBaseMatrix> & grad_mat,
+				 py::list py_const_vecs) {
+	  auto petsc_ksp = ksp->GetKSP();
+	  PETScPC pc; KSPGetPC(petsc_ksp, &pc);
+
+	  PCHYPRESetDiscreteGradient(pc, grad_mat->GetPETScMat());
+
+	  auto const_vecs = makeCArraySharedPtr<shared_ptr<ngs::BaseVector>>(py_const_vecs);
+	  auto ozz = ksp->GetMatrix()->GetRowMap()->CreatePETScVector();
+	  ksp->GetMatrix()->GetRowMap()->NGs2PETSc(*const_vecs[0], ozz);
+	  auto zoz = ksp->GetMatrix()->GetRowMap()->CreatePETScVector();
+	  ksp->GetMatrix()->GetRowMap()->NGs2PETSc(*const_vecs[1], zoz);
+	  auto zzo = ksp->GetMatrix()->GetRowMap()->CreatePETScVector();
+	  ksp->GetMatrix()->GetRowMap()->NGs2PETSc(*const_vecs[2], zzo);
+	  PCHYPRESetEdgeConstantVectors(pc, ozz, zoz, zzo);
+
+	   }, py::arg("grad_mat"), py::arg("xyz_const_vecs"))
       .def("GetMatrix", [](shared_ptr<PETScKSP> & ksp) { return ksp->GetMatrix(); } )
       .def("SetPC", [](shared_ptr<PETScKSP> & aksp, shared_ptr<PETScBasePrecond> & apc) {
 	  aksp->SetPC(apc);
