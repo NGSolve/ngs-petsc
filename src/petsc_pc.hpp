@@ -71,7 +71,7 @@ namespace ngs_petsc_interface
     PETSc2NGsPrecond (shared_ptr<PETScBaseMatrix> _petsc_amat = nullptr, shared_ptr<PETScBaseMatrix> _petsc_pmat = nullptr,
 		      string _name = "", FlatArray<string> _petsc_options = Array<string>())
       : PETScBasePrecond(_petsc_amat, _petsc_pmat, _name, _petsc_options),
-	ngs::Preconditioner( nullptr, ngs::Flags({"not_register_for_auto_update"}), _name)
+	ngs::Preconditioner( shared_ptr<ngs::BilinearForm>(), ngs::Flags({"not_register_for_auto_update"}), _name)
     { PETScBasePrecond::Finalize(); }
 
     virtual void Mult (const ngs::BaseVector & x, ngs::BaseVector & y) const override;
