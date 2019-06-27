@@ -45,8 +45,9 @@ namespace ngs_petsc_interface
     KSPCreate(comm, &GetKSP());
 
     // set prefix so we can define unique options for this KSP object
-    string name = (_name.size()) ? _name : GetDefaultId(); name += string("_");
-    KSPSetOptionsPrefix(GetKSP(), name.c_str());
+    // string name = (_name.size()) ? _name : GetDefaultId(); name += string("_");
+    string name = "";
+    // KSPSetOptionsPrefix(GetKSP(), name.c_str());
 
     // Hand given options to global option DB with prefix name
     SetOptions (_opts, name, NULL);
@@ -63,7 +64,7 @@ namespace ngs_petsc_interface
 
 
   PETScKSP :: PETScKSP (shared_ptr<ngs::BaseMatrix> _ngs_mat, shared_ptr<ngs::BitArray> _freedofs, FlatArray<string> _opts, string _name)
-    : PETScKSP (make_shared<PETScMatrix> (_ngs_mat, _freedofs, _freedofs, MATMPIAIJ), _opts, _name)
+    : PETScKSP (make_shared<PETScMatrix> (_ngs_mat, _freedofs, _freedofs), _opts, _name)
   { ; }
 
 
