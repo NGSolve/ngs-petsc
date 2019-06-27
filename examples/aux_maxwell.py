@@ -138,3 +138,6 @@ if ex_sol:
 
     if comm.rank==0:
         print('err ', nerr)
+
+petsc.Finalize()
+

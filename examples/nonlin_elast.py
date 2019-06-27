@@ -153,3 +153,5 @@ for loadstep in range(50):
     #     print(' ----- ')
 
         
+petsc.Finalize()
+

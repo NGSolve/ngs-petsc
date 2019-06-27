@@ -61,7 +61,7 @@ def rb_modes(fes):
 
 petsc.Initialize()
 
-mat_wrap = petsc.PETScMatrix(a.mat, freedofs=V.FreeDofs())
+mat_wrap = petsc.PETScMatrix(a.mat, freedofs=V.FreeDofs(), format=petsc.PETScMatrix.AIJ)
 opts = {"ksp_type":"cg", "ksp_atol":1e-30, "ksp_rtol":1e-8, "pc_type":"ml"}
 ksp = petsc.KSP(mat=mat_wrap, name="someksp", petsc_options=opts, finalize=False)
 ksp.GetMatrix().SetNearNullSpace(rb_modes(V))
@@ -91,3 +91,6 @@ if comm.rank==0:
     print('PETSc took nits:', ksp_res['nits'])
     print('init. norm res: ', ksp_res['errs'][0])
     print(' fin. norm res: ', ksp_res['res_norm'])
+
+petsc.Finalize()
+
