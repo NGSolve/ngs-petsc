@@ -8,11 +8,15 @@ namespace ngs_petsc_interface
       (used to identify options in the petsc options DB) **/
   string GetDefaultId ();
 
+
   void SetOptions (FlatArray<string> opts_vals, string prefix = "", PetscOptions opts = NULL);
+
 
   void InitializePETSc (FlatArray<string> options);
   
+
   void FinalizePETSc ();
+
 
 } // ngs_petsc_interface
 

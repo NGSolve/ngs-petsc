@@ -19,13 +19,16 @@ namespace ngs_petsc_interface
     PetscInitialize(&argc, &cpptr, NULL, NULL);
   }
 
+
   void FinalizePETSc () { PetscFinalize(); }
+
 
   string GetDefaultId ()
   {
     static int cnt = 0;
     return string("NgsPETScObject_"+to_string(cnt++));
   }
+
 
   void SetOptions (FlatArray<string> opts_vals, string prefix, PetscOptions petsc_options)
   {
@@ -43,6 +46,7 @@ namespace ngs_petsc_interface
       }
     }
   }
+
 
   void ExportUtils (py::module &m)
   {
@@ -75,5 +79,6 @@ namespace ngs_petsc_interface
       });
 
   }
+
 
 } // ngs_petsc_interface
