@@ -56,18 +56,17 @@ namespace ngs_petsc_interface
   }
 
 
-  PETSc2NGsPrecond :: PETSc2NGsPrecond (shared_ptr<ngs::BilinearForm> bfa, const ngs::Flags & aflags,
-					const string aname)
-    : PETScBasePrecond(bfa->GetFESpace()->IsParallel() ? MPI_Comm(bfa->GetFESpace()->GetParallelDofs()->GetCommunicator()) : PETSC_COMM_SELF, aname),
-      ngs::Preconditioner (bfa, aflags, aname)
+  PETSc2NGsPrecond :: PETSc2NGsPrecond (shared_ptr<ngs::BilinearForm> _bfa, const ngs::Flags & _aflags, const string _aname)
+    : PETScBasePrecond(_bfa->GetFESpace()->IsParallel() ? MPI_Comm(_bfa->GetFESpace()->GetParallelDofs()->GetCommunicator()) : PETSC_COMM_SELF, _aname),
+      ngs::Preconditioner (_bfa, _aflags, _aname), bfa(_bfa)
   {
     auto & petsc_options = flags.GetStringListFlag("petsc_pc_petsc_options");
     SetOptions(petsc_options, PETScBasePrecond::GetName(), NULL);
   }
 
 
-  PETSc2NGsPrecond :: PETSc2NGsPrecond (const ngs::PDE & apde, const ngs::Flags & aflags, const string aname)
-    : PETScBasePrecond(MPI_COMM_NULL, ""), ngs::Preconditioner( &apde, aflags, aname)
+  PETSc2NGsPrecond :: PETSc2NGsPrecond (const ngs::PDE & _apde, const ngs::Flags & _aflags, const string _aname)
+    : PETScBasePrecond(MPI_COMM_NULL, ""), ngs::Preconditioner( &_apde, _aflags, _aname)
   { throw Exception("Not implemented! (Who still uses PDE files?)"); }
 
 
@@ -173,6 +172,145 @@ namespace ngs_petsc_interface
     PCShellSetContext(cpc, (void*)component.get());
     PCShellSetApply(cpc, component->ApplyPC);
   }
+
+
+  PETScHypreAuxiliarySpacePC :: PETScHypreAuxiliarySpacePC (shared_ptr<ngs::BilinearForm> _bfa, const ngs::Flags & _aflags, const string _aname)
+    : PETSc2NGsPrecond(_bfa, _aflags, _aname)
+  {
+    ;
+  }
+
+  PETScHypreAuxiliarySpacePC :: PETScHypreAuxiliarySpacePC (const ngs::PDE & _apde, const ngs::Flags & _aflags, const string _aname)
+    : PETSc2NGsPrecond(_apde, _aflags, _aname)
+  {
+    ;
+  }
+
+  PETScHypreAuxiliarySpacePC :: PETScHypreAuxiliarySpacePC (shared_ptr<PETScBaseMatrix> _petsc_amat, shared_ptr<PETScBaseMatrix> _petsc_pmat,
+							    string _name, FlatArray<string> _petsc_options)
+    : PETSc2NGsPrecond(_petsc_amat, _petsc_pmat, _name, _petsc_options)
+  {
+    ;
+  }
+
+
+  void PETScHypreAuxiliarySpacePC :: SetConstantVectors (shared_ptr<ngs::BaseVector> _ozz, shared_ptr<ngs::BaseVector> _zoz, shared_ptr<ngs::BaseVector> _zzo)
+  {
+    ozz = _ozz; zoz = _zoz; zzo = _zzo;
+    if (ozz != nullptr)
+      { dimension = (zzo == nullptr) ? 2 : 3; }
+  }
+
+
+  void PETScHypreAuxiliarySpacePC :: FinalizeLevel (const ngs::BaseMatrix * mat)
+  {
+    // PC, dim (used for AMS), HD-embed, HD-embed components, HC-embed, HC-embed components
+    if (HD_embed || HC_embed) {
+      PCHYPRESetInterpolations(GetPETScPC(), dimension,
+			       HD_embed ? HD_embed->GetPETScMat() : NULL, NULL,
+			       HC_embed ? HC_embed->GetPETScMat() : NULL, NULL);
+    }
+    PETSc2NGsPrecond :: FinalizeLevel();
+  }
+
+
+  PETScHypreAMS :: PETScHypreAMS (shared_ptr<ngs::BilinearForm> _bfa, const ngs::Flags & _aflags, const string _aname)
+    : PETScHypreAuxiliarySpacePC (_bfa, _aflags, _aname)
+  {
+    if (bfa == nullptr)
+      { throw Exception("AMS Preconditioner with nullptr BLF, not sure how that happens..."); }
+
+    if (dynamic_pointer_cast<ngs::HCurlHighOrderFESpace>(bfa->GetFESpace()) == nullptr)
+      { throw Exception(string("AMS does not work for space") + typeid(_bfa->GetFESpace()).name() + string("!!")); }
+
+    dimension = bfa->GetMeshAccess()->GetDimension();
+  }
+
+
+  PETScHypreAMS :: PETScHypreAMS (const ngs::PDE & _apde, const ngs::Flags & _aflags, const string _aname)
+    : PETScHypreAuxiliarySpacePC (_apde, _aflags, _aname)
+  {
+    ;
+  }
+
+
+  PETScHypreAMS :: PETScHypreAMS (shared_ptr<PETScBaseMatrix> _petsc_amat, shared_ptr<PETScBaseMatrix> _petsc_pmat,
+				  string _name, FlatArray<string> _petsc_options)
+    : PETScHypreAuxiliarySpacePC (_petsc_amat, _petsc_pmat, _name, _petsc_options)
+  {
+    PCSetType(GetPETScPC(), PCHYPRE);
+    PCHYPRESetType(GetPETScPC(), "hypre");
+    FinalizeLevel ();
+  }
+
+
+  void PETScHypreAMS :: InitLevel (shared_ptr<ngs::BitArray> freedofs)
+  {
+    PETSc2NGsPrecond :: InitLevel (freedofs);
+
+    if ( bfa == nullptr )
+      { throw Exception("PETScHypreAMS::InitLevel called, but we have no bilinearform. How did we get here??"); }
+
+    if (grad_mat == nullptr) {
+      auto feshc = dynamic_pointer_cast<ngs::HCurlHighOrderFESpace>(bfa->GetFESpace());
+      auto fesh1 = feshc->CreateGradientSpace();
+      shared_ptr<ngs::BaseMatrix> grad = feshc->CreateGradient(*fesh1);
+
+      shared_ptr<ngs::BitArray> h1_subset;
+      if (freedofs != bfa->GetFESpace()->GetFreeDofs()) { // we are being used as a coarse grid solver I think
+	// adjust freedofs for the scalar h1-space
+	h1_subset = make_shared<BitArray>(fesh1->GetNDof());
+	h1_subset->Clear();
+	auto spmat = dynamic_pointer_cast<ngs::BaseSparseMatrix>(grad);
+	for (auto k : Range(spmat->Height())) {
+	  if (subset->Test(k)) {
+	    for (auto j : spmat->GetRowIndices(k))
+	      { h1_subset->Set(j); }
+	  }
+	}
+      }
+      else
+	{ h1_subset = fesh1->GetFreeDofs(); }
+
+      if (feshc->IsParallel())
+	{ grad = make_shared<ngs::ParallelMatrix>(grad, fesh1->GetParallelDofs(), feshc->GetParallelDofs(), ngs::PARALLEL_OP::C2C); }
+
+      auto petsc_grad_mat = make_shared<PETScMatrix> (grad, h1_subset, subset);
+    }
+    
+  }
+
+
+  void PETScHypreAMS :: FinalizeLevel (const ngs::BaseMatrix * mat)
+  {
+    if (petsc_amat == nullptr) { // probably build via RegisterPreconditioner - convert matrix
+      shared_ptr<NGs2PETScVecMap> vec_map;
+      if (grad_mat != nullptr) // re-use vec-map if possible
+	{ vec_map = grad_mat->GetColMap(); }
+      petsc_pmat = petsc_amat = make_shared<PETScMatrix> (shared_ptr<BaseMatrix>(const_cast<BaseMatrix*>(mat), NOOP_Deleter),
+							  subset, subset, vec_map, vec_map);
+    }
+
+    if (grad_mat == nullptr) {
+      // should we try to construct this from bfa->GetFESpace? This sould have happened in InitLevel already ...
+      throw Exception("The AMS Preconditioner needs the discrete H1-to-HCurl gradient Matrix!");
+    }
+
+    PCHYPRESetDiscreteGradient(GetPETScPC(), grad_mat->GetPETScMat());
+
+    if (ozz != nullptr) {
+      auto hc_map = GetAMat()->GetRowMap();
+      PETScVec pozz = hc_map->CreatePETScVector(), pzoz = hc_map->CreatePETScVector(), pzzo = (zzo != nullptr) ? hc_map->CreatePETScVector() : nullptr;
+      hc_map->NGs2PETSc(*ozz, pozz);
+      hc_map->NGs2PETSc(*zoz, pzoz);
+      if (zzo != nullptr)
+	{ hc_map->NGs2PETSc(*zzo, pzzo); }
+      PCHYPRESetEdgeConstantVectors(GetPETScPC(), pozz, pzoz, (zzo != nullptr) ? pzzo : NULL);
+    }
+
+    PETScHypreAuxiliarySpacePC :: FinalizeLevel (mat);
+  }
+
 
 
   FSField :: FSField (shared_ptr<PETScBasePrecond> _pc, string _name)

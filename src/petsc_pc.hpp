@@ -62,11 +62,11 @@ namespace ngs_petsc_interface
   {
   public:
 
-    PETSc2NGsPrecond (shared_ptr<ngs::BilinearForm> bfa, const ngs::Flags & aflags,
-		      const string aname = "petsc_precond");
+    PETSc2NGsPrecond (shared_ptr<ngs::BilinearForm> _bfa, const ngs::Flags & _aflags,
+		      const string _aname = "petsc_precond");
 
     // does not do anything, but we need to have it in oder to register the Preconditioner
-    PETSc2NGsPrecond (const ngs::PDE & apde, const ngs::Flags & aflags, const string aname = "precond");
+    PETSc2NGsPrecond (const ngs::PDE & _apde, const ngs::Flags & _aflags, const string _aname = "petsc_precond");
 
     PETSc2NGsPrecond (shared_ptr<PETScBaseMatrix> _petsc_amat = nullptr, shared_ptr<PETScBaseMatrix> _petsc_pmat = nullptr,
 		      string _name = "", FlatArray<string> _petsc_options = Array<string>())
@@ -85,6 +85,7 @@ namespace ngs_petsc_interface
     virtual void FinalizeLevel (const ngs::BaseMatrix * mat = nullptr) override;
     virtual void Update ()  override { ; }
   protected:
+    shared_ptr<ngs::BilinearForm> bfa;
     using PETScBasePrecond::name; // there is also a name in Preconditioner
     shared_ptr<BitArray> subset; // only used to stash freedofs given in InitLevel
   };
@@ -99,6 +100,74 @@ namespace ngs_petsc_interface
   protected:
     Array<shared_ptr<NGs2PETScPrecond>> keep_alive;
   };
+
+
+  class PETScHypreAuxiliarySpacePC : public PETSc2NGsPrecond
+  {
+  public:
+    PETScHypreAuxiliarySpacePC (shared_ptr<ngs::BilinearForm> _bfa, const ngs::Flags & _aflags,
+				const string _aname = "petsc_hypre_precond");
+
+    PETScHypreAuxiliarySpacePC (const ngs::PDE & _apde, const ngs::Flags & _aflags, const string _aname = "petsc_hypre_precond");
+
+    PETScHypreAuxiliarySpacePC (shared_ptr<PETScBaseMatrix> _petsc_amat = nullptr, shared_ptr<PETScBaseMatrix> _petsc_pmat = nullptr,
+				string _name = "", FlatArray<string> _petsc_options = Array<string>());
+
+    void SetGradientMatrix (shared_ptr<PETScMatrix> _grad_mat) { grad_mat = _grad_mat; }
+    // void SetGradientMatrix (shared_ptr<BaseMatrix> _grad_mat);
+
+    void SetCurlMatrix (shared_ptr<PETScMatrix> _curl_mat) { curl_mat = _curl_mat; }
+    // void SetCurlMatrix (shared_ptr<BaseMatrix> _curl_mat);
+
+    void SetHCurlEmbeddingMatrix (shared_ptr<PETScMatrix> _HC_embed) { HC_embed = _HC_embed; }
+    // void SetHCurlEmbeddingMatrix (shared_ptr<BaseMatrix> _HC_embed);
+
+    void SetHDivEmbeddingMatrix (shared_ptr<PETScMatrix> _HD_embed) { HD_embed = _HD_embed; }
+    // void SetHDivEmbeddingMatrix (shared_ptr<BaseMatrix> _HD_embed);
+
+    void SetVectorLaplaceMatrix (shared_ptr<PETScMatrix> _alpha_mat) { alpha_mat = _alpha_mat; }
+    // void SetVectorLaplaceMatrix (shared_ptr<BaseMatrix> _alpha_mat);
+
+    void SetScalarLaplaceMatrix (shared_ptr<PETScMatrix> _beta_mat) { beta_mat = _beta_mat; }
+    // void SetScalarLaplaceMatrix (shared_ptr<BaseMatrix> _beta_mat);
+
+    void SetConstantVectors (shared_ptr<ngs::BaseVector> _ozz, shared_ptr<ngs::BaseVector> _zoz, shared_ptr<ngs::BaseVector> _zzo);
+
+    virtual void FinalizeLevel (const ngs::BaseMatrix * mat = nullptr) override;
+
+  protected:
+    PetscInt dimension = 3;                // dimension (used for AMS)
+    shared_ptr<PETScMatrix> grad_mat;      // (scalar) H1 -> HC gradient matrix
+    shared_ptr<PETScMatrix> curl_mat;      // HC -> HD curl
+    shared_ptr<PETScMatrix> HC_embed;      // (vector) H1 -> HC embedding matrix
+    shared_ptr<PETScMatrix> HD_embed;      // (vector) H1 -> HD embedding matrix
+    shared_ptr<PETScMatrix> alpha_mat;     // vector stiffness matrix
+    shared_ptr<PETScMatrix> beta_mat;      // scalar stiffness matrix
+    shared_ptr<ngs::BaseVector> ozz, zoz, zzo;  // (1,0,0), (0,1,0) and (0,0,1) in HC basis
+  };
+
+
+  class PETScHypreAMS : public PETScHypreAuxiliarySpacePC
+  {
+  public:
+    PETScHypreAMS (shared_ptr<ngs::BilinearForm> _bfa, const ngs::Flags & _aflags,
+		   const string _aname = "petsc_hypre_ams_precond");
+
+    PETScHypreAMS (const ngs::PDE & _apde, const ngs::Flags & _aflags, const string _aname = "petsc_hypre_ams_precond");
+
+    PETScHypreAMS (shared_ptr<PETScBaseMatrix> _petsc_amat = nullptr, shared_ptr<PETScBaseMatrix> _petsc_pmat = nullptr,
+		   string _name = "", FlatArray<string> _petsc_options = Array<string>());
+
+    virtual void InitLevel (shared_ptr<ngs::BitArray> freedofs = nullptr) override;
+
+    virtual void FinalizeLevel (const ngs::BaseMatrix * mat = nullptr) override;
+  };
+
+
+  // class PETScHypreADS : public PETScHypreAuxiliarySpacePC
+  // {
+
+  // };
 
 
   class FSField

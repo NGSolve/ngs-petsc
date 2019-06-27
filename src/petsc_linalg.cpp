@@ -9,7 +9,8 @@ namespace ngs_petsc_interface
 
 
   template<class TM>
-  void SetPETScMatSeq (PETScMat petsc_mat, shared_ptr<ngs::SparseMatrixTM<TM>> spmat, shared_ptr<ngs::BitArray> rss, shared_ptr<ngs::BitArray> css)
+  void SetPETScMatSeq (PETScMat petsc_mat, shared_ptr<ngs::SparseMatrixTM<TM>> spmat,
+		       shared_ptr<ngs::BitArray> rss, shared_ptr<ngs::BitArray> css)
   {
     PetscInt bs; MatGetBlockSize(petsc_mat, &bs);
     if (bs != ngs::mat_traits<TM>::WIDTH) {
@@ -327,6 +328,93 @@ namespace ngs_petsc_interface
   } // CreatePETScMatSeq
 
 
+  /**
+     Only leaves entries in the matrix where we are master of row-dof OR col-dof.
+     ( -> do this for the local mats of a C2C-ParallelMatrix)
+   **/
+  template<class TM>
+  void DeleteDuplicateValuesTM (PETScMat petsc_mat, shared_ptr<ngs::SparseMatrixTM<TM>> spmat,
+			      shared_ptr<ngs::ParallelDofs> pdrow, shared_ptr<ngs::ParallelDofs> pdcol,
+			      shared_ptr<ngs::BitArray> rss, shared_ptr<ngs::BitArray> css)
+  {
+    PetscInt bs; MatGetBlockSize(petsc_mat, &bs);
+    if (bs != ngs::mat_traits<TM>::WIDTH) {
+      throw Exception(string("Block-Size of petsc-mat (") + to_string(bs) + string(") != block-size of ngs-mat(")
+		      + to_string(ngs::mat_traits<TM>::WIDTH) + string(")"));
+    }
+	
+    // row map (map for a row)
+    PetscInt bw = ngs::mat_traits<TM>::WIDTH;
+    int nbrow = 0;
+    Array<int> row_compress(spmat->Width());
+    for (auto k : Range(spmat->Width()))
+      { row_compress[k] = (!rss || rss->Test(k)) ? nbrow++ : -1; }
+    int ncols = nbrow * bw;
+    
+    // col map (map for a col)
+    PetscInt bh = ngs::mat_traits<TM>::HEIGHT;
+    int nbcol = 0;
+    Array<int> col_compress(spmat->Height());
+    for (auto k : Range(spmat->Height()))
+      { col_compress[k] = (!css || css->Test(k)) ? nbcol++ : -1; }
+    int nrows = nbcol * bh;
+    
+    TM zero(0);
+    PetscScalar* data = get_ptr(zero);
+
+    for (auto k : Range(spmat->Height())) {
+      auto ck = col_compress[k];
+      if ( (ck == -1) || pdcol->IsMasterDof(k) ) continue;
+      auto ri = spmat->GetRowIndices(k);
+      for (auto j : Range(ri.Size())) {
+	auto cj = row_compress[ri[j]];
+	if ( (cj != -1) && !pdrow->IsMasterDof(ri[j]) )
+	  { MatSetValuesBlocked(petsc_mat, 1, &ck, 1, &cj, data, INSERT_VALUES); }
+      }
+    }
+
+    MatAssemblyBegin(petsc_mat, MAT_FINAL_ASSEMBLY);
+    MatAssemblyEnd(petsc_mat, MAT_FINAL_ASSEMBLY);
+  }
+
+
+  void DeleteDuplicateValues (PETScMat petsc_mat, shared_ptr<ngs::BaseMatrix> mat,
+			      shared_ptr<ngs::ParallelDofs> pdrow, shared_ptr<ngs::ParallelDofs> pdcol,
+			      shared_ptr<ngs::BitArray> rss, shared_ptr<ngs::BitArray> css)
+  {
+    if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<double>>(mat))
+      { DeleteDuplicateValuesTM (petsc_mat, spmat, pdrow, pdcol, rss, css) ; }
+#if MAX_SYS_DIM >= 2
+    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<Mat<2,2,double>>>(mat))
+      { DeleteDuplicateValuesTM (petsc_mat, spmat, pdrow, pdcol, rss, css) ; }
+#endif
+#if MAX_SYS_DIM >= 3
+    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<Mat<3,3,double>>>(mat))
+      { DeleteDuplicateValuesTM (petsc_mat, spmat, pdrow, pdcol, rss, css) ; }
+#endif
+#if MAX_SYS_DIM >= 4
+    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<Mat<4,4,double>>>(mat))
+      { DeleteDuplicateValuesTM (petsc_mat, spmat, pdrow, pdcol, rss, css) ; }
+#endif
+#if MAX_SYS_DIM >= 5
+    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<Mat<5,5,double>>>(mat))
+      { DeleteDuplicateValuesTM (petsc_mat, spmat, pdrow, pdcol, rss, css) ; }
+#endif
+#if MAX_SYS_DIM >= 6
+    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<Mat<6,6,double>>>(mat))
+      { DeleteDuplicateValuesTM (petsc_mat, spmat, pdrow, pdcol, rss, css) ; }
+#endif
+#if MAX_SYS_DIM >=7
+    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<Mat<7,7,double>>>(mat))
+      { DeleteDuplicateValuesTM (petsc_mat, spmat, pdrow, pdcol, rss, css) ; }
+#endif
+#if MAX_SYS_DIM >=8
+    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<Mat<8,8,double>>>(mat))
+      { DeleteDuplicateValuesTM (petsc_mat, spmat, pdrow, pdcol, rss, css) ; }
+#endif
+  }
+
+
   void PETScBaseMatrix :: SetNullSpace (MatNullSpace null_space)
   {
     MatSetNullSpace(GetPETScMat(), null_space);
@@ -567,6 +655,9 @@ namespace ngs_petsc_interface
     // local PETSc matrix
     PETScMat petsc_mat_loc = CreatePETScMatSeq(spmat, row_subset, col_subset);
 
+    if (parmat && (parmat->GetOpType() == ngs::PARALLEL_OP::C2C))
+      { DeleteDuplicateValues(petsc_mat_loc, spmat, row_pardofs, col_pardofs, row_subset, col_subset); }
+    
     int bs; MatGetBlockSize(petsc_mat_loc, &bs);
 
     // Vector conversions
