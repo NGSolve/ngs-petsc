@@ -478,8 +478,11 @@ namespace ngs_petsc_interface
 	   -> shared_ptr<PETScBasePrecond> {
 	     if (auto n2p_pc = dynamic_pointer_cast<PETSc2NGsPrecond>(pc))
 	       { return n2p_pc; }
-	     else
-	       { return make_shared<NGs2PETScPrecond>(mat, pc, name); }
+	     else {
+	       if (mat == nullptr)
+		 { throw Exception("PETSc-Preconditioners need to know what they are a Preconditioner FOR, please provide that matrix."); }
+	       return make_shared<NGs2PETScPrecond>(mat, pc, name);
+	     }
 	   }, py::arg("pc"), py::arg("mat") = nullptr, py::arg("name") = "");
 
     py::class_<PETSc2NGsPrecond, shared_ptr<PETSc2NGsPrecond>, PETScBasePrecond, ngs::BaseMatrix>
