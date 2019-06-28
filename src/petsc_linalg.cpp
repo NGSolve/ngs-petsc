@@ -719,23 +719,30 @@ namespace ngs_petsc_interface
     : PETScBaseMatrix(_ngs_mat, _row_subset, _col_subset, _row_map, _col_map)
   {
 
+    // working vectors
+    row_hvec = ngs_mat->CreateRowVector();
+    col_hvec = ngs_mat->CreateColVector();
+
+    // haha, this is actually the easiest way to find out if a matrix is parallel
     shared_ptr<ngs::ParallelDofs> row_pardofs, col_pardofs;
-    if (auto parmat = dynamic_pointer_cast<ngs::ParallelMatrix>(ngs_mat)) {
-      row_pardofs = parmat->GetRowParallelDofs();
-      col_pardofs = parmat->GetColParallelDofs();
-    }
-    else if (auto pc = dynamic_pointer_cast<ngs::Preconditioner>(ngs_mat))
-      { row_pardofs = col_pardofs = pc->GetAMatrix().GetParallelDofs(); }
-    else // can also be a preconditioner, a ProductMatrix, etc..
-      { row_pardofs = col_pardofs = GetNGsMat()->GetParallelDofs(); }
+    if (auto par_row_vec = dynamic_pointer_cast<ngs::ParallelBaseVector>(row_hvec))
+      { row_pardofs = par_row_vec->GetParallelDofs(); }
+    if (auto par_col_vec = dynamic_pointer_cast<ngs::ParallelBaseVector>(col_hvec))
+      { col_pardofs = par_col_vec->GetParallelDofs(); }
+
+    // better take pardofs from created vectors I think (e.g sum-matrix, product-matrix, etc..)
+    // if (auto parmat = dynamic_pointer_cast<ngs::ParallelMatrix>(ngs_mat)) {
+    //   row_pardofs = parmat->GetRowParallelDofs();
+    //   col_pardofs = parmat->GetColParallelDofs();
+    // }
+    // else if (auto pc = dynamic_pointer_cast<ngs::Preconditioner>(ngs_mat))
+    //   { row_pardofs = col_pardofs = pc->GetAMatrix().GetParallelDofs(); }
+    // else // can also be a preconditioner, a ProductMatrix, etc..
+    //   { row_pardofs = col_pardofs = GetNGsMat()->GetParallelDofs(); }
 
     bool parallel = row_pardofs != nullptr;
 
     MPI_Comm comm = (parallel) ? MPI_Comm(row_pardofs->GetCommunicator()) : PETSC_COMM_SELF;
-
-    // working vectors
-    row_hvec = ngs_mat->CreateRowVector();
-    col_hvec = ngs_mat->CreateColVector();
 
     // Vector conversions
     if (row_map == nullptr) {
@@ -758,7 +765,9 @@ namespace ngs_petsc_interface
     // Create a Shell matrix, where we have to set function pointers for operations
     // ( the "this" - pointer can be recovered with MatShellGetConext )
     // cout << "MATSHELL " << endl;
-    // cout << " " << row_map->GetNRowsLocal() << " " << col_map->GetNRowsLocal() << " " << row_map->GetNRowsGlobal() << " " << col_map->GetNRowsGlobal() << endl;
+    // cout << "nrows " << row_map->GetNRowsLocal() << " " << col_map->GetNRowsLocal() << " " << row_map->GetNRowsGlobal() << " " << col_map->GetNRowsGlobal() << endl;
+    // if (row_pardofs != nullptr)
+    //   { cout << "pardof- ndofs" << row_pardofs->GetNDofLocal() << " " << row_pardofs->GetNDofGlobal() << " " << col_pardofs->GetNDofLocal() << " " << col_pardofs->GetNDofGlobal() << endl; }
     MatCreateShell (comm, row_map->GetNRowsLocal(), col_map->GetNRowsLocal(), row_map->GetNRowsGlobal(), col_map->GetNRowsGlobal(), (void*) this, &petsc_mat);
 
     /** Set function pointers **/
