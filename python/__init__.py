@@ -1,12 +1,26 @@
 from . import libpetscinterface
 
-libpetscinterface.__all__ = ['Initialize', 'Finalize', 'PETScBaseMatrix', 'PETScMatrix',
-                             'FlatPETScMatrix', 'PETScPrecond', 'PETSc2NGsPrecond', 'FieldSplitPrecond',
-                             'NGs2PETScPrecond', 'KSP', 'SNES']
+# general utilities
+libpetscinterface.__all__ = ["Initialize", "Finalize"]
+
+# linear algebra
+libpetscinterface.__all__ += ["PETScBaseMatrix", "PETScMatrix",
+                              "FlatPETScMatrix"]
+
+# preconditioners
+libpetscinterface.__all__ += ["PETScPrecond", "PETSc2NGsPrecond", "NGs2PETScPrecond",
+                              "HypreAMSPrecond", "FieldSplitPrecond"]
+
+# linear solver
+libpetscinterface.__all__ += ["KSP"]
+
+# nmon-linear solver
+libpetscinterface.__all__ += ["SNES"]
+
 
 from .libpetscinterface import *
 
 # this calls Finalize before all PETSc objects can be cleaned up ...
-# import atexit
-# atexit.register(libpetscinterface.Finalize)
-# libpetscinterface.Initialize()
+import atexit
+atexit.register(libpetscinterface.Finalize)
+libpetscinterface.Initialize()

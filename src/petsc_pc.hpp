@@ -24,6 +24,7 @@ namespace ngs_petsc_interface
 
     string GetName () const { return name; }
 
+    /** makes the PETScPC ready to use **/
     virtual void Finalize ();
 
   protected:

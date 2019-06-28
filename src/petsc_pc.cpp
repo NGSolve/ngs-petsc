@@ -70,9 +70,6 @@ namespace ngs_petsc_interface
   { throw Exception("Not implemented! (Who still uses PDE files?)"); }
 
 
-  ngs::RegisterPreconditioner<PETSc2NGsPrecond> registerPETSc2NGsPrecond("petsc_pc");
-
-
   void PETSc2NGsPrecond :: InitLevel (shared_ptr<ngs::BitArray> freedofs)
   {
     subset = freedofs;
@@ -81,7 +78,13 @@ namespace ngs_petsc_interface
 
   void PETSc2NGsPrecond :: FinalizeLevel (const ngs::BaseMatrix * mat)
   {
-    petsc_pmat = petsc_amat = make_shared<PETScMatrix>(shared_ptr<BaseMatrix>(const_cast<BaseMatrix*>(mat), NOOP_Deleter), subset, subset);
+    if (petsc_amat == nullptr) {
+      if (mat == nullptr)
+	{ throw Exception("PETSc2NGsPrecond has no matrix!"); }
+      petsc_amat = make_shared<PETScMatrix>(shared_ptr<BaseMatrix>(const_cast<BaseMatrix*>(mat), NOOP_Deleter), subset, subset);
+    }
+    if (petsc_pmat == nullptr)
+      { petsc_pmat = petsc_amat; }
 
     petsc_rhs = GetAMat()->GetRowMap()->CreatePETScVector();
     petsc_sol = GetAMat()->GetColMap()->CreatePETScVector();
@@ -224,13 +227,16 @@ namespace ngs_petsc_interface
       { throw Exception(string("AMS does not work for space") + typeid(_bfa->GetFESpace()).name() + string("!!")); }
 
     dimension = bfa->GetMeshAccess()->GetDimension();
+
+    PCSetType(GetPETScPC(), PCHYPRE);
+    PCHYPRESetType(GetPETScPC(), "ams");
   }
 
 
   PETScHypreAMS :: PETScHypreAMS (const ngs::PDE & _apde, const ngs::Flags & _aflags, const string _aname)
     : PETScHypreAuxiliarySpacePC (_apde, _aflags, _aname)
   {
-    ;
+    throw Exception("PETScHypreAMS PDE-constructor not implemented. (Who still uses PDE files ... ?");
   }
 
 
@@ -239,8 +245,7 @@ namespace ngs_petsc_interface
     : PETScHypreAuxiliarySpacePC (_petsc_amat, _petsc_pmat, _name, _petsc_options)
   {
     PCSetType(GetPETScPC(), PCHYPRE);
-    PCHYPRESetType(GetPETScPC(), "hypre");
-    FinalizeLevel ();
+    PCHYPRESetType(GetPETScPC(), "ams");
   }
 
 
@@ -284,6 +289,8 @@ namespace ngs_petsc_interface
   void PETScHypreAMS :: FinalizeLevel (const ngs::BaseMatrix * mat)
   {
     if (petsc_amat == nullptr) { // probably build via RegisterPreconditioner - convert matrix
+      if (mat == nullptr)
+	{ throw Exception("PETScHypreAMS::FinalizeLevel, have no matrix!"); }
       shared_ptr<NGs2PETScVecMap> vec_map;
       if (grad_mat != nullptr) // re-use vec-map if possible
 	{ vec_map = grad_mat->GetColMap(); }
@@ -401,6 +408,12 @@ namespace ngs_petsc_interface
   }
 
 
+  ngs::RegisterPreconditioner<PETSc2NGsPrecond> registerPETSc2NGsPrecond("petsc_pc");
+
+  ngs::RegisterPreconditioner<PETScHypreAMS> registerPETScHypreAMS("petsc_pc_hypre_ams");
+
+
+
   void ExportPC (py::module & m)
   {
     extern Array<string> Dict2SA (py::dict & petsc_options);
@@ -414,7 +427,9 @@ namespace ngs_petsc_interface
 	    ([] (shared_ptr<PETScBaseMatrix> mat, shared_ptr<ngs::BaseMatrix> pc, string name)
 	     {
 	       return make_shared<NGs2PETScPrecond>(mat, pc);
-	     }), py::arg("mat"), py::arg("pc"), py::arg("name") = string(""));
+	     }), py::arg("mat"), py::arg("pc"), py::arg("name") = string(""))
+      .def("Finalize", [](shared_ptr<NGs2PETScPrecond> & pc)
+	   { pc->Finalize(); } );
 	    
     py::class_<PETSc2NGsPrecond, shared_ptr<PETSc2NGsPrecond>, PETScBasePrecond, ngs::BaseMatrix>
       (m, "PETSc2NGsPrecond", "A Preconditioner built in PETsc")
@@ -424,6 +439,40 @@ namespace ngs_petsc_interface
 	       auto opt_array = Dict2SA(petsc_options);
 	       return make_shared<PETSc2NGsPrecond>(amat, amat, name, opt_array);
 	     }), py::arg("mat"), py::arg("name"), py::arg("petsc_options") = py::dict());
+
+    py::class_<PETScHypreAuxiliarySpacePC, shared_ptr<PETScHypreAuxiliarySpacePC>, PETSc2NGsPrecond>
+      (m, "HypreAuxiliarySpacePrecond", "ADS/AMS from hypre package")
+      .def ("SetGradientMatrix"      , [](shared_ptr<PETScHypreAuxiliarySpacePC> & pc, shared_ptr<PETScMatrix> mat)
+	    { pc->SetGradientMatrix(mat); })
+      .def ("SetHCurlEmbeddingMatrix", [](shared_ptr<PETScHypreAuxiliarySpacePC> & pc, shared_ptr<PETScMatrix> mat)
+	    { pc->SetHCurlEmbeddingMatrix(mat); })
+      .def ("SetHDivEmbeddingMatrix" , [](shared_ptr<PETScHypreAuxiliarySpacePC> & pc, shared_ptr<PETScMatrix> mat)
+	    { pc->SetHDivEmbeddingMatrix(mat); })
+      .def ("SetVectorLaplaceMatrix" , [](shared_ptr<PETScHypreAuxiliarySpacePC> & pc, shared_ptr<PETScMatrix> mat)
+	    { pc->SetVectorLaplaceMatrix(mat); })
+      .def ("SetScalarLaplaceMatrix" , [](shared_ptr<PETScHypreAuxiliarySpacePC> & pc, shared_ptr<PETScMatrix> mat)
+	    { pc->SetScalarLaplaceMatrix(mat); })
+      .def ("SetConstantVectors"     , [](shared_ptr<PETScHypreAuxiliarySpacePC> & pc, shared_ptr<ngs::BaseVector> ozz,
+					  shared_ptr<ngs::BaseVector> zoz, shared_ptr<ngs::BaseVector> zzo)
+	    { pc->SetConstantVectors(ozz, zoz, zzo); },
+	    py::arg("ozz"), py::arg("zoz"), py::arg("zzo") = nullptr);
+
+    py::class_<PETScHypreAMS, shared_ptr<PETScHypreAMS>, PETScHypreAuxiliarySpacePC>
+      (m, "HypreAMSPrecond", "Auxiliary Maxwell Space Preconditioner from hypre")
+      .def (py::init<>
+	    ([](shared_ptr<PETScBaseMatrix> amat, string name, py::dict petsc_options,
+		shared_ptr<PETScMatrix> grad_mat)
+	     {
+	       auto opt_array = Dict2SA(petsc_options);
+
+	       auto pc = make_shared<PETScHypreAMS>(amat, amat, name, opt_array);
+
+	       if (grad_mat != nullptr)
+		 { pc->SetGradientMatrix(grad_mat); }
+
+	       return pc;
+	     }), py::arg("mat"), py::arg("name") = "", py::arg("petsc_options") = py::dict(),
+	    py::arg("grad_mat") = nullptr);
 
     py::class_<PETScFieldSplitPC, shared_ptr<PETScFieldSplitPC>, PETSc2NGsPrecond>
       (m, "FieldSplitPrecond", "Fieldsplit Preconditioner from PETSc")
@@ -437,9 +486,7 @@ namespace ngs_petsc_interface
 	   {
 	     auto opt_array = Dict2SA(petsc_options);
 	     pc->AddField(make_shared<FSFieldRange>(pc->GetAMat(), lower, upper, name));
-	   }, py::arg("lower"), py::arg("upper"), py::arg("name") = "", py::arg("petsc_options") = py::dict())
-      .def("Finalize", [](shared_ptr<PETScFieldSplitPC> & pc)
-	   { pc->Finalize(); } );
+	   }, py::arg("lower"), py::arg("upper"), py::arg("name") = "", py::arg("petsc_options") = py::dict());
   }
 
 
