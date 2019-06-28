@@ -427,9 +427,7 @@ namespace ngs_petsc_interface
 	    ([] (shared_ptr<PETScBaseMatrix> mat, shared_ptr<ngs::BaseMatrix> pc, string name)
 	     {
 	       return make_shared<NGs2PETScPrecond>(mat, pc);
-	     }), py::arg("mat"), py::arg("pc"), py::arg("name") = string(""))
-      .def("Finalize", [](shared_ptr<NGs2PETScPrecond> & pc)
-	   { pc->Finalize(); } );
+	     }), py::arg("mat"), py::arg("pc"), py::arg("name") = string(""));
 	    
     py::class_<PETSc2NGsPrecond, shared_ptr<PETSc2NGsPrecond>, PETScBasePrecond, ngs::BaseMatrix>
       (m, "PETSc2NGsPrecond", "A Preconditioner built in PETsc")
@@ -438,7 +436,9 @@ namespace ngs_petsc_interface
 	     {
 	       auto opt_array = Dict2SA(petsc_options);
 	       return make_shared<PETSc2NGsPrecond>(amat, amat, name, opt_array);
-	     }), py::arg("mat"), py::arg("name"), py::arg("petsc_options") = py::dict());
+	     }), py::arg("mat"), py::arg("name"), py::arg("petsc_options") = py::dict())
+      .def("Finalize", [](shared_ptr<PETSc2NGsPrecond> & pc)
+	   { pc->FinalizeLevel(); } );
 
     py::class_<PETScHypreAuxiliarySpacePC, shared_ptr<PETScHypreAuxiliarySpacePC>, PETSc2NGsPrecond>
       (m, "HypreAuxiliarySpacePrecond", "ADS/AMS from hypre package")
