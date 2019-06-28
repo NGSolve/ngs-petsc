@@ -251,12 +251,15 @@ namespace ngs_petsc_interface
 
   void PETScHypreAMS :: InitLevel (shared_ptr<ngs::BitArray> freedofs)
   {
+
     PETSc2NGsPrecond :: InitLevel (freedofs);
 
     if ( bfa == nullptr )
       { throw Exception("PETScHypreAMS::InitLevel called, but we have no bilinearform. How did we get here??"); }
 
-    if (grad_mat == nullptr) {
+    if (grad_mat == nullptr) { // we have no discrete gradient matrix
+      // try to construct it here
+
       auto feshc = dynamic_pointer_cast<ngs::HCurlHighOrderFESpace>(bfa->GetFESpace());
       auto fesh1 = feshc->CreateGradientSpace();
       shared_ptr<ngs::BaseMatrix> grad = feshc->CreateGradient(*fesh1);
@@ -273,14 +276,56 @@ namespace ngs_petsc_interface
 	      { h1_subset->Set(j); }
 	  }
 	}
+	if (fesh1->IsParallel()) {
+	  // say there is a vertex on an an interface with only one free edge, which is in the interior of one of the procs
+	  // -> we have to make this consistent!
+	  auto vec = make_shared<ngs::S_ParallelBaseVectorPtr<double>>(fesh1->GetNDof(), 1, fesh1->GetParallelDofs(), ngs::DISTRIBUTED);
+	  auto fv = vec->FVDouble();
+	  for (auto k : Range(fv))
+	    { fv[k] = h1_subset->Test(k) ? 1 : 0; }
+	  vec->Cumulate();
+	  size_t add = 0;
+	  for (auto k : Range(fv))
+	    { if (fv[k] != 0) { if (!h1_subset->Test(k)) add++; h1_subset->Set(k); } }
+	}
       }
       else
 	{ h1_subset = fesh1->GetFreeDofs(); }
 
+      if ( (HC_embed == nullptr) && (ozz == nullptr) ) { // we have no H1-to-HCurl embedding and no constant vecs
+	// construct (1,0,0), (0,1,0), (0,0,1) in HCurl basis
+	ngs::Flags flags;
+	flags.SetFlag("novisual");
+	auto gf = ngs::CreateGridFunction(feshc, "temp_gf", flags);
+	gf->Update();
+	auto make_vec = [&]() -> shared_ptr<ngs::BaseVector> {
+	  if (feshc->IsParallel())
+	    { return make_shared<ngs::S_ParallelBaseVectorPtr<double>>(feshc->GetNDof(), 1, feshc->GetParallelDofs(), ngs::CUMULATED); }
+	  else
+	    { return make_shared<ngs::VVector<double>>(feshc->GetNDof()); }
+	};
+	LocalHeap lh(5 * 1024 * 1024, "ams_create_cvecs");
+	auto make_cvec = [&](double valx, double valy, double valz)
+	  -> shared_ptr<ngs::BaseVector> {
+	  HeapReset hr(lh);
+	  auto vec = make_vec();
+	  Array<shared_ptr<ngs::CoefficientFunction>> cfa (
+	  { make_shared<ngs::ConstantCoefficientFunction> (double(valx)),
+	      make_shared<ngs::ConstantCoefficientFunction> (double(valy)),
+	      make_shared<ngs::ConstantCoefficientFunction> (double(valz)) });
+	  auto vec_cf = ngs::MakeVectorialCoefficientFunction(move(cfa));
+	  ngs::SetValues (vec_cf, *gf, ngs::VOL, NULL, lh);
+	  *vec = gf->GetVector();
+	  return vec;
+	};
+	SetConstantVectors(make_cvec(1,0,0), make_cvec(0,1,0), make_cvec(0,0,1));
+      }
+
       if (feshc->IsParallel())
 	{ grad = make_shared<ngs::ParallelMatrix>(grad, fesh1->GetParallelDofs(), feshc->GetParallelDofs(), ngs::PARALLEL_OP::C2C); }
 
-      auto petsc_grad_mat = make_shared<PETScMatrix> (grad, h1_subset, subset);
+      grad_mat = make_shared<PETScMatrix> (grad, h1_subset, subset);
+
     }
     
   }
@@ -304,7 +349,7 @@ namespace ngs_petsc_interface
     }
 
     PCHYPRESetDiscreteGradient(GetPETScPC(), grad_mat->GetPETScMat());
-
+    
     if (ozz != nullptr) {
       auto hc_map = GetAMat()->GetRowMap();
       PETScVec pozz = hc_map->CreatePETScVector(), pzoz = hc_map->CreatePETScVector(), pzzo = (zzo != nullptr) ? hc_map->CreatePETScVector() : nullptr;
@@ -429,6 +474,14 @@ namespace ngs_petsc_interface
 	       return make_shared<NGs2PETScPrecond>(mat, pc);
 	     }), py::arg("mat"), py::arg("pc"), py::arg("name") = string(""));
 	    
+    m.def ("ConvertNGsPrecond", [](shared_ptr<ngs::BaseMatrix> pc, shared_ptr<PETScBaseMatrix> mat, string name)
+	   -> shared_ptr<PETScBasePrecond> {
+	     if (auto n2p_pc = dynamic_pointer_cast<PETSc2NGsPrecond>(pc))
+	       { return n2p_pc; }
+	     else
+	       { return make_shared<NGs2PETScPrecond>(mat, pc, name); }
+	   }, py::arg("pc"), py::arg("mat") = nullptr, py::arg("name") = "");
+
     py::class_<PETSc2NGsPrecond, shared_ptr<PETSc2NGsPrecond>, PETScBasePrecond, ngs::BaseMatrix>
       (m, "PETSc2NGsPrecond", "A Preconditioner built in PETsc")
       .def (py::init<>

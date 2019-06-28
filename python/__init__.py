@@ -8,7 +8,7 @@ libpetscinterface.__all__ += ["PETScBaseMatrix", "PETScMatrix",
                               "FlatPETScMatrix"]
 
 # preconditioners
-libpetscinterface.__all__ += ["PETScPrecond", "PETSc2NGsPrecond", "NGs2PETScPrecond",
+libpetscinterface.__all__ += ["PETScPrecond", "PETSc2NGsPrecond", "ConvertNGsPrecond", "NGs2PETScPrecond",
                               "HypreAMSPrecond", "FieldSplitPrecond"]
 
 # linear solver
