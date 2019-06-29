@@ -7,18 +7,21 @@ comm = mpi_world
 
 if comm.rank==0:
     from netgen.geom2d import unit_square
-    ngm = unit_square.GenerateMesh(maxh=0.3)
+    ngm = unit_square.GenerateMesh(maxh=0.01)
     ngm.Distribute(comm)
 else:
     ngm = NGMesh.Receive(comm)
 mesh = Mesh(ngm)
 
-V = H1(mesh, order=1, dirichlet='.*')
+V = VectorH1(mesh, order=4, dirichlet='.*')
 u,v = V.TnT()
 a = BilinearForm(V)
-a += SymbolicBFI(grad(u)*grad(v) + u * v)
+a += SymbolicBFI(InnerProduct(grad(u),grad(v)))
 f = LinearForm(V)
-f += SymbolicLFI(v)
+if v.dims[0]>1 or len(v.dims)>1:
+    f += SymbolicLFI(v[0] + v[1])
+else:
+    f += SymbolicLFI(v)
 f.Assemble()
 gfu = GridFunction(V)
 # c = Preconditioner(a, 'bddc')
@@ -31,11 +34,26 @@ opts = {"ksp_type":"cg", "ksp_atol":1e-30, "ksp_rtol":1e-8,
         #"pc_view" : "",
         #"ksp_view" : "",
         "ksp_monitor" : "",
-        "pc_type" : "hypre"}
+        "pc_type" : "gamg"}
 #        "pc_hypre_type" : "boomeramg"}
 #opts = {"ksp_type" : "cg", "ksp_atol" : 1e-30, "ksp_rtol" : 1e-8}
 
-mat_wrap = petsc.PETScMatrix(a.mat, freedofs=V.FreeDofs())
+mtdim = v.dims[0] if v.dims[0]>1 else v.dims[1]
+
+gf_one = GridFunction(V)
+kvecs = [gf_one.vec.CreateVector() for k in range(mtdim)]
+if v.dims[0]>1 or len(v.dims)>1:
+    gf_one.Set(CoefficientFunction((1,0)))
+    kvecs[0].data = gf_one.vec
+    gf_one.Set(CoefficientFunction((0,1)))
+    kvecs[1].data = gf_one.vec
+else:
+    gf_one.Set(1)
+    kvecs = [gf_one.vec.CreateVector()]
+    kvecs[0].data = gf_one.vec
+    
+mat_wrap = petsc.PETScMatrix(a.mat, freedofs=V.FreeDofs(), format=petsc.PETScMatrix.AIJ)
+mat_wrap.SetNearNullSpace(kvecs)
 #mat_wrap = petsc.FlatPETScMatrix(a.mat, freedofs=V.FreeDofs())
 ksp = petsc.KSP(mat=mat_wrap, name="someksp", petsc_options=opts, finalize=True)
 
@@ -47,14 +65,12 @@ t = -time()
 gfu.vec.data = ksp * f.vec
 t += time()
 
+quit()
 
 mat_convert = petsc.PETScMatrix(a.mat, freedofs=V.FreeDofs())
-gf_one = GridFunction(V)
-gf_one.Set(1)
-mat_convert.SetNearNullSpace([gf_one.vec])
+# mat_convert.SetNearNullSpace(kvecs)
 petsc_pc = petsc.PETSc2NGsPrecond(mat=mat_convert, name="reverse_someksp",
-                                  petsc_options = {"pc_type" : "gamg",
-                                                   "pc_hypre_type" : "boomeramg",
+                                  petsc_options = {"pc_type" : "ml",
                                                    "pc_monitor" : "",
                                                    "pc_view" : ""})
 t2 = -time()

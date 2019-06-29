@@ -92,19 +92,25 @@ namespace ngs_petsc_interface
     Finalize();
   }
 
-
-  void PETSc2NGsPrecond :: Mult (const ngs::BaseVector & x, ngs::BaseVector & y) const
+  void PETSc2NGsPrecond :: MultAdd (double scal, const ngs::BaseVector & x, ngs::BaseVector & y) const
   {
-    static ngs::Timer tm("PETSc2NGsPrecond::Mult");
-    static ngs::Timer ts("PETSc2NGsPrecond::PCApply");
-    ngs::RegionTimer rts(tm);
+    static ngs::Timer t("PETSc2NGsPrecond::MultAdd"); ngs::RegionTimer rt(t);
 
     GetAMat()->GetRowMap()->NGs2PETSc(const_cast<ngs::BaseVector&>(x), petsc_rhs);
 
-    {
-      ngs::RegionTimer rts(ts);
-      PCApply (GetPETScPC(), petsc_rhs, petsc_sol);
-    }
+    PCApply (GetPETScPC(), petsc_rhs, petsc_sol);
+
+    GetAMat()->GetColMap()->AddPETSc2NGs(scal, y, petsc_sol);
+
+  }
+
+  void PETSc2NGsPrecond :: Mult (const ngs::BaseVector & x, ngs::BaseVector & y) const
+  {
+    static ngs::Timer t("PETSc2NGsPrecond::Mult"); ngs::RegionTimer rt(t);
+
+    GetAMat()->GetRowMap()->NGs2PETSc(const_cast<ngs::BaseVector&>(x), petsc_rhs);
+
+    PCApply (GetPETScPC(), petsc_rhs, petsc_sol);
 
     GetAMat()->GetColMap()->PETSc2NGs(y, petsc_sol);
 
@@ -123,6 +129,8 @@ namespace ngs_petsc_interface
     : PETScBasePrecond(_mat, _mat, _name, _petsc_options),
       FlatPETScMatrix(_ngs_pc, nullptr, nullptr, _mat->GetRowMap(), _mat->GetColMap())
   {
+    static ngs::Timer t("NGs2PETScPrecond constructor"); ngs::RegionTimer rt(t);
+
     // shared_ptr<ngs::ParallelDofs> pardofs;
     // if (auto pc = dynamic_pointer_cast<ngs::Preconditioner>(ngs_mat))
     //   { pardofs = pc->GetAMatrix().GetParallelDofs(); }
@@ -143,6 +151,8 @@ namespace ngs_petsc_interface
 
   PetscErrorCode NGs2PETScPrecond :: ApplyPC (PETScPC pc, PETScVec x, PETScVec y)
   {
+    static ngs::Timer t("NGs2PETScPrecond::ApplyPC"); ngs::RegionTimer rt(t);
+
     void* ptr; PCShellGetContext(pc, &ptr);
     auto & n2p_pre = *( (NGs2PETScPrecond*) ptr);
 
@@ -160,6 +170,8 @@ namespace ngs_petsc_interface
 					string _name, FlatArray<string> _petsc_options)
     : PETSc2NGsPrecond (_petsc_amat, _petsc_pmat, _name, _petsc_options)
   {
+    static ngs::Timer t("PETScCompositePC constructor"); ngs::RegionTimer rt(t);
+
     PCSetType(GetPETScPC(), PCCOMPOSITE);
   }
 
@@ -265,6 +277,7 @@ namespace ngs_petsc_interface
       shared_ptr<ngs::BaseMatrix> grad = feshc->CreateGradient(*fesh1);
 
       shared_ptr<ngs::BitArray> h1_subset;
+
       if (freedofs != bfa->GetFESpace()->GetFreeDofs()) { // we are being used as a coarse grid solver I think
 	// adjust freedofs for the scalar h1-space
 	h1_subset = make_shared<BitArray>(fesh1->GetNDof());
@@ -291,7 +304,7 @@ namespace ngs_petsc_interface
       }
       else
 	{ h1_subset = fesh1->GetFreeDofs(); }
-
+      
       if ( (HC_embed == nullptr) && (ozz == nullptr) ) { // we have no H1-to-HCurl embedding and no constant vecs
 	// construct (1,0,0), (0,1,0), (0,0,1) in HCurl basis
 	ngs::Flags flags;
@@ -325,6 +338,9 @@ namespace ngs_petsc_interface
 	{ grad = make_shared<ngs::ParallelMatrix>(grad, fesh1->GetParallelDofs(), feshc->GetParallelDofs(), ngs::PARALLEL_OP::C2C); }
 
       grad_mat = make_shared<PETScMatrix> (grad, h1_subset, subset);
+
+      // PetscViewer ov; PetscViewerASCIIOpen(MPI_COMM_WORLD,"gmat2.mat",&ov);
+      // MatView(grad_mat->GetPETScMat(), ov);
 
     }
     

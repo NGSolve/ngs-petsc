@@ -76,6 +76,7 @@ namespace ngs_petsc_interface
     { PETScBasePrecond::Finalize(); }
 
     virtual void Mult (const ngs::BaseVector & x, ngs::BaseVector & y) const override;
+    virtual void MultAdd (double scal, const ngs::BaseVector & x, ngs::BaseVector & y) const override;
     virtual ngs::AutoVector CreateRowVector () const override { return GetAMat()->GetRowMap()->CreateNGsVector(); }
     virtual ngs::AutoVector CreateColVector () const override { return GetAMat()->GetColMap()->CreateNGsVector(); }
     virtual int VHeight () const override { return GetAMat()->GetNGsMat()->VHeight(); }

@@ -1,5 +1,6 @@
 from ngsolve import *
 from netgen.csg import *
+import time
 
 import ngs_petsc as petsc
 petsc.Initialize()
@@ -31,6 +32,7 @@ else:
     from netgen.meshing import Mesh as NGMesh
     ngmesh = NGMesh.Receive(comm)
     ngmesh.SetGeometry(geom)
+ngmesh.Refine()
 mesh = Mesh(ngmesh)
 mesh.Curve(5)
 
@@ -119,15 +121,25 @@ pcvec = E @ pc_h1v @ E.T
 pc = pcgrad + pcvec + jac.mat
 
 gfu = GridFunction(HC)
+t1 = -time.time()
 solvers.CG(mat=a.mat, pre=pc, rhs=f.vec, sol=gfu.vec, tol=1e-6, maxsteps=500, printrates=mpi_world.rank==0)
+t1 = t1 + time.time()
 
-from ngsolve.la import EigenValues_Preconditioner
-ngsglobals.msg_level = 0
-evs = EigenValues_Preconditioner(a.mat, pc)
-print('min, max ev = ', evs[0], '/', evs[len(evs)-1], ', Condition = ', evs[len(evs)-1]/evs[0])
+# from ngsolve.la import EigenValues_Preconditioner
+# ngsglobals.msg_level = 0
+# evs = EigenValues_Preconditioner(a.mat, pc)
+# print('min, max ev = ', evs[0], '/', evs[len(evs)-1], ', Condition = ', evs[len(evs)-1]/evs[0])
 
 
-ex_sol = True
+if comm.rank == 0:
+    print(' ----------- ')
+    print('ndof H-Curl space: ', HC.ndofglobal)
+    print('low order ndof H-Curl space: ', HC.lospace.ndofglobal)
+    print('t solve', t1)
+    print('dofs / (sec * np) ', HC.ndofglobal / (t1 * max(comm.size-1, 1)) )
+    print(' ----------- ')
+
+ex_sol = False
 if ex_sol:
     err = f.vec.CreateVector()
     exsol = f.vec.CreateVector()
@@ -138,6 +150,3 @@ if ex_sol:
 
     if comm.rank==0:
         print('err ', nerr)
-
-petsc.Finalize()
-

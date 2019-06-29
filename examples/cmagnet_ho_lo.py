@@ -42,18 +42,18 @@ mesh.Curve(5)
 
 ngsglobals.msg_level = 1
 
-HC = HCurl(mesh, order=5, dirichlet="outer", nograds = True)
+HC = HCurl(mesh, order=3, dirichlet="outer", nograds = False)
 u,v = HC.TnT()
 
-a = BilinearForm(HC, symmetric=False)
-mur = { "core" : 1000, "coil" : 1, "air" : 1 }
+a = BilinearForm(HC, symmetric=False, condense=True)
+mur = { "core" : 1, "coil" : 1, "air" : 1 }
 mu0 = 1.257e-6
 nu_coef = [ 1/(mu0*mur[mat]) for mat in mesh.GetMaterials() ]
 nu = CoefficientFunction(nu_coef)
 a += SymbolicBFI(nu*curl(u)*curl(v) + 1e-6*nu*u*v)
 
 # c = Preconditioner(a, "petsc_pc_hypre_ams")
-c = Preconditioner(a, "bddc", coarsetype="petsc_pc_hypre_ams", petsc_pc_petsc_options=["pc_hypre_ams_print_level 3"])
+c = Preconditioner(a, "bddc", coarsetype="petsc_pc_hypre_ams")
 # c = Preconditioner(a, "bddc")
 
 
@@ -61,12 +61,9 @@ f = LinearForm(HC)
 f += SymbolicLFI(CoefficientFunction((y,0.05-x,0)) * v, definedon=mesh.Materials("coil"))
 
 ngsglobals.numthreads = 4 if comm.size == 1 else 1
-# with TaskManager():
-#     f.Assemble()
-#     a.Assemble()
-
-f.Assemble()
-a.Assemble()
+with TaskManager():
+    f.Assemble()
+    a.Assemble()
 
 # amat = petsc.PETScMatrix(a.mat, row_freedofs=HC.FreeDofs(), col_freedofs=HC.FreeDofs())
 amat = petsc.FlatPETScMatrix(a.mat, row_freedofs=HC.FreeDofs(), col_freedofs=HC.FreeDofs())
@@ -74,8 +71,8 @@ ksp = petsc.KSP(amat, name="cmagnet",
                 petsc_options = { "ksp_type" : "cg",
                                   "ksp_atol" : 1e-30,
                                   "ksp_monitor" : "",
+                                  "ksp_view_eigenvalues" : "",
                                   # "ksp_view" : "",
-                                  # "ksp_view_eigenvalues" : "" },
                                   "ksp_rtol" : 1e-6},
                 finalize = False)
 ksp.SetPC(petsc.ConvertNGsPrecond(c, mat=amat))
