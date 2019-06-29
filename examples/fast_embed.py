@@ -70,10 +70,12 @@ def FastEmbed(V_GOAL, V_ORIGIN):
     # agoal += sigma * taudual * dx # not needed b.c static condensation
     agoal.Assemble()
 
-    eblocks = [ V_GOAL.GetDofNrs(e) for e in V_GOAL.mesh.edges ]
-    fblocks = [ V_GOAL.GetDofNrs(f) for f in V_GOAL.mesh.faces ]
-    # cblocks = [ V_GOAL.GetDofNrs(e) for e in V_GOAL.mesh.Elements() ]
-
+    freedofs = V_GOAL.FreeDofs() # dont care about dirichlet
+    free_list = lambda L : [x for x in L if freedofs[x]]
+    eblocks = [ x for x in (free_list(V_GOAL.GetDofNrs(e))
+                            for e in V_GOAL.mesh.edges) if len(x) ]
+    fblocks = [ x for x in (free_list(V_GOAL.GetDofNrs(f)) for f in V_GOAL.mesh.faces) if len(x) ]
+    
     solve_goal = FastInv(agoal.mat, eblocks, fblocks)
 
     amix_mat = amix.mat if mpi_world.size == 1 else amix.mat.local_mat

@@ -4,7 +4,7 @@ import time
 
 maxh = 0.5
 diri = "outer"
-order = 3
+order = 2
 condense = True
 
 def MakeGeometry():
@@ -38,6 +38,7 @@ else:
     from netgen.meshing import Mesh as NGMesh
     ngmesh = NGMesh.Receive(comm)
     ngmesh.SetGeometry(geom)
+ngmesh.Refine()
 mesh = Mesh(ngmesh)
 ngsglobals.msg_level = 0
 mesh.Curve(3)
@@ -58,7 +59,8 @@ with TaskManager(pajetrace = 10 * 1024 * 1024 if comm.rank in [0,1] else 0):
     beta = 1e-6 * nu
     sigma, tau = HC.TnT()
     a = BilinearForm(HC, condense=condense)
-    a += SymbolicBFI(alpha * curl(sigma) * curl(tau) + beta * sigma * tau)
+    a += alpha * curl(sigma) * curl(tau) * dx
+    a += beta * sigma * tau * dx
     jac = Preconditioner(a, "local")
     a.Assemble()
 
@@ -77,6 +79,7 @@ with TaskManager(pajetrace = 10 * 1024 * 1024 if comm.rank in [0,1] else 0):
     us, vs = H1s.TnT()
     h1s_blf = BilinearForm(H1s, condense=condense)
     h1s_blf += beta * grad(us) * grad(vs) * dx
+    # h1s_blf += beta * us * vs * dx
     h1s_blf.Assemble()
 
 
@@ -117,7 +120,7 @@ with TaskManager(pajetrace = 10 * 1024 * 1024 if comm.rank in [0,1] else 0):
         raise 'invalid choice scal'
 
     ## Putting the gradient range preconditioner together
-    pc_h1s = SelectH1sPC(2, True)
+    pc_h1s = SelectH1sPC(2, order>1)
     pcgrad = G @ pc_h1s @ G.T
 
 
@@ -149,6 +152,7 @@ with TaskManager(pajetrace = 10 * 1024 * 1024 if comm.rank in [0,1] else 0):
     uv, vv = H1v.TnT()
     h1v_blf = BilinearForm(H1v, condense=condense)
     h1v_blf += alpha * InnerProduct(grad(uv), grad(vv)) * dx
+    # h1v_blf += alpha * InnerProduct(uv, vv) * dx
     h1v_blf.Assemble()
 
 
@@ -196,7 +200,7 @@ with TaskManager(pajetrace = 10 * 1024 * 1024 if comm.rank in [0,1] else 0):
         raise 'invalid choice vec'
 
     ## Putting the vector-h1 preconditioner together
-    pc_h1v = SelectH1vPC(2, True)
+    pc_h1v = SelectH1vPC(2, nullspace=True)
     pcvec = E @ pc_h1v @ ET
 
     gfu = GridFunction(HC)
@@ -208,7 +212,7 @@ with TaskManager(pajetrace = 10 * 1024 * 1024 if comm.rank in [0,1] else 0):
     # pcsmo = petsc.PETSc2NGsPrecond(hcmat, "pcsmo", petsc_options = {"pc_type" : "sor"})
 
     # the full preconditioner
-    pc = pcvec + pcgrad + pcsmo
+    pc = pcvec + pcgrad + jac
 
     pam = petsc.FlatPETScMatrix(a.mat, HC.FreeDofs(condense))
     ksp = petsc.KSP(mat=pam, name="aux_ksp",
@@ -225,7 +229,6 @@ with TaskManager(pajetrace = 10 * 1024 * 1024 if comm.rank in [0,1] else 0):
     ksp.SetPC(pcpc)
     ksp.Finalize()
 
-
     comm.Barrier()
     t1 = -time.time()
     gfu.vec.data = ksp * f.vec
@@ -234,8 +237,10 @@ with TaskManager(pajetrace = 10 * 1024 * 1024 if comm.rank in [0,1] else 0):
     comm.Barrier()
     t2 = -time.time()
     solvers.CG(mat=a.mat, pre=pc, rhs=f.vec, sol=gfu.vec, tol=1e-6, maxsteps=500, printrates=mpi_world.rank==0)
-    t2 = t2 + time.time()    
+    t2 = t2 + time.time()
 
+
+    
 
     if comm.rank == 0:
         print(' ----------- ')
@@ -250,7 +255,7 @@ with TaskManager(pajetrace = 10 * 1024 * 1024 if comm.rank in [0,1] else 0):
         print(' ----------- ')
 
 
-    ex_sol = True
+    ex_sol = False
     if ex_sol:
         err = f.vec.CreateVector()
         exsol = f.vec.CreateVector()
