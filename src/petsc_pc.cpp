@@ -508,7 +508,7 @@ namespace ngs_petsc_interface
 	     {
 	       auto opt_array = Dict2SA(petsc_options);
 	       return make_shared<PETSc2NGsPrecond>(amat, amat, name, opt_array);
-	     }), py::arg("mat"), py::arg("name"), py::arg("petsc_options") = py::dict())
+	     }), py::arg("mat"), py::arg("name") = "", py::arg("petsc_options") = py::dict())
       .def("Finalize", [](shared_ptr<PETSc2NGsPrecond> & pc)
 	   { pc->FinalizeLevel(); } );
 
