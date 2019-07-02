@@ -189,6 +189,7 @@ namespace ngs_petsc_interface
   }
 
 
+#ifdef PETSC_HAS_HYPRE
   PETScHypreAuxiliarySpacePC :: PETScHypreAuxiliarySpacePC (shared_ptr<ngs::BilinearForm> _bfa, const ngs::Flags & _aflags, const string _aname)
     : PETSc2NGsPrecond(_bfa, _aflags, _aname)
   {
@@ -378,8 +379,7 @@ namespace ngs_petsc_interface
 
     PETScHypreAuxiliarySpacePC :: FinalizeLevel (mat);
   }
-
-
+#endif
 
   FSField :: FSField (shared_ptr<PETScBasePrecond> _pc, string _name)
     : pc(_pc), name(_name)
@@ -471,8 +471,9 @@ namespace ngs_petsc_interface
 
   ngs::RegisterPreconditioner<PETSc2NGsPrecond> registerPETSc2NGsPrecond("petsc_pc");
 
+#ifdef PETSC_HAS_HYPRE
   ngs::RegisterPreconditioner<PETScHypreAMS> registerPETScHypreAMS("petsc_pc_hypre_ams");
-
+#endif
 
 
   void ExportPC (py::module & m)
@@ -512,6 +513,7 @@ namespace ngs_petsc_interface
       .def("Finalize", [](shared_ptr<PETSc2NGsPrecond> & pc)
 	   { pc->FinalizeLevel(); } );
 
+#ifdef PETSC_HAS_HYPRE
     py::class_<PETScHypreAuxiliarySpacePC, shared_ptr<PETScHypreAuxiliarySpacePC>, PETSc2NGsPrecond>
       (m, "HypreAuxiliarySpacePrecond", "ADS/AMS from hypre package")
       .def ("SetGradientMatrix"      , [](shared_ptr<PETScHypreAuxiliarySpacePC> & pc, shared_ptr<PETScMatrix> mat)
@@ -545,6 +547,7 @@ namespace ngs_petsc_interface
 	       return pc;
 	     }), py::arg("mat"), py::arg("name") = "", py::arg("petsc_options") = py::dict(),
 	    py::arg("grad_mat") = nullptr);
+#endif
 
     py::class_<PETScFieldSplitPC, shared_ptr<PETScFieldSplitPC>, PETSc2NGsPrecond>
       (m, "FieldSplitPrecond", "Fieldsplit Preconditioner from PETSc")

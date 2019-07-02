@@ -4,6 +4,10 @@
 namespace ngs_petsc_interface
 {
 
+#ifndef PETSC_NO_HYPRE
+#define PETSC_HAS_HYPRE
+#endif
+
   namespace ngs = ngcomp;
   using ngs::Array;
   using ngs::Range;
