@@ -162,7 +162,7 @@ namespace ngs_petsc_interface
 
 	  PCHYPRESetDiscreteGradient(pc, grad_mat->GetPETScMat());
 
-	  auto const_vecs = makeCArraySharedPtr<shared_ptr<ngs::BaseVector>>(py_const_vecs);
+	  auto const_vecs = makeCArray<shared_ptr<ngs::BaseVector>>(py_const_vecs);
 	  auto ozz = ksp->GetMatrix()->GetRowMap()->CreatePETScVector();
 	  ksp->GetMatrix()->GetRowMap()->NGs2PETSc(*const_vecs[0], ozz);
 	  auto zoz = ksp->GetMatrix()->GetRowMap()->CreatePETScVector();

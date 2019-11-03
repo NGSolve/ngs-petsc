@@ -891,11 +891,11 @@ namespace ngs_petsc_interface
     py::class_<PETScBaseMatrix, shared_ptr<PETScBaseMatrix>, ngs::BaseMatrix>
       (m, "PETScBaseMatrix", "Can be used as an NGSolve- or as a PETSc- Matrix")
       .def("SetNullSpace", [](shared_ptr<PETScBaseMatrix> & mat, py::list py_kvecs) {
-	  Array<shared_ptr<ngs::BaseVector>> kvecs = makeCArraySharedPtr<shared_ptr<ngs::BaseVector>>(py_kvecs);
+	  Array<shared_ptr<ngs::BaseVector>> kvecs = makeCArray<shared_ptr<ngs::BaseVector>>(py_kvecs);
 	  mat->SetNullSpace(NullSpaceCreate(kvecs, mat->GetRowMap()));
 	}, py::arg("kvecs"))
       .def("SetNearNullSpace", [](shared_ptr<PETScBaseMatrix> & mat, py::list py_kvecs) {
-	  Array<shared_ptr<ngs::BaseVector>> kvecs = makeCArraySharedPtr<shared_ptr<ngs::BaseVector>>(py_kvecs);
+	  Array<shared_ptr<ngs::BaseVector>> kvecs = makeCArray<shared_ptr<ngs::BaseVector>>(py_kvecs);
 	  mat->SetNearNullSpace(NullSpaceCreate(kvecs, mat->GetRowMap()));
 	}, py::arg("kvecs"));
     

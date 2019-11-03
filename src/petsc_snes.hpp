@@ -28,6 +28,7 @@ namespace ngs_petsc_interface
     INLINE shared_ptr<PETScKSP> GetKSP () const { return ksp; }
 
     void Solve (ngs::BaseVector & sol);
+    void Solve (ngs::BaseVector & sol, ngs::BaseVector & rhs);
 
     // f = F(x)
     static PetscErrorCode EvaluateF (SNES snes, PETScVec x, PETScVec f, void* ctx);
@@ -41,7 +42,7 @@ namespace ngs_petsc_interface
     JACOBI_MAT_MODE mode;
     SNES snes;
     shared_ptr<PETScKSP> ksp;
-    PETScVec func_vec, sol_vec;
+    PETScVec func_vec, sol_vec, rhs_vec;
     shared_ptr<PETScBaseMatrix> jac_mat;
     shared_ptr<ngs::BaseVector> row_vec, col_vec, lin_vec;
   };

@@ -72,13 +72,14 @@ namespace ngs_petsc_interface
       if (mode == FLAT)
 	{ jac_mat = make_shared<FlatPETScMatrix> (blf->GetMatrixPtr(), row_fds, col_fds, row_map, col_map); }
       else if (mode == CONVERT) // IS makes UpdateValues easier
-	{ jac_mat = make_shared<PETScMatrix> (blf->GetMatrixPtr(), row_fds, col_fds, row_map, col_map); }
+	{ jac_mat = make_shared<PETScMatrix> (blf->GetMatrixPtr(), row_fds, col_fds, PETScMatrix::AIJ, row_map, col_map); }
     }
 
     // buffer vectors
     row_vec = jac_mat->GetRowMap()->CreateNGsVector();
     col_vec = jac_mat->GetColMap()->CreateNGsVector();
-    sol_vec = jac_mat->GetRowMap()->CreatePETScVector();
+    sol_vec = jac_mat->GetColMap()->CreatePETScVector();
+    rhs_vec = jac_mat->GetRowMap()->CreatePETScVector();
 
     // Create SNES
     SNESCreate(comm, &GetSNES());
@@ -89,11 +90,15 @@ namespace ngs_petsc_interface
 
     // set prefix so we can define unique options for this SNES object
     string name = (_name.size()) ? _name : GetDefaultId();
-    SNESSetOptionsPrefix(GetSNES(), name.c_str());
-    // KSPSetOptionsPrefix(GetKSP()->GetKSP(), name.c_str());
+    if (_name.size()) {
+      SNESSetOptionsPrefix(GetSNES(), name.c_str());
+      // KSPSetOptionsPrefix(GetKSP()->GetKSP(), name.c_str());
 
-    // Hand given options to global option DB with prefix name
-    SetOptions (_opts, name, NULL);
+      // Hand given options to global option DB with prefix name
+      SetOptions (_opts, name, NULL);
+    }
+    else
+      { SetOptions (_opts, "", NULL); }
 
     // Create Vector to hold F(x)
     func_vec = jac_mat->GetRowMap()->CreatePETScVector();
@@ -139,6 +144,31 @@ namespace ngs_petsc_interface
     {
       RegionTimer rt(tp);
       SNESSolve(GetSNES(), NULL, sol_vec);
+    }
+
+    // cout << "SNES SOL: " << sol_vec << endl;
+    // VecView(sol_vec, PETSC_VIEWER_STDOUT_WORLD);
+
+    jac_mat->GetRowMap()->PETSc2NGs(sol, sol_vec);
+
+  }
+
+
+  void PETScSNES :: Solve (ngs::BaseVector & sol, ngs::BaseVector & rhs)
+  {
+    static ngs::Timer tt("PETSc::SNES::Solve - total");
+    static ngs::Timer tp("PETSc::SNES::Solve - PETSc");
+    RegionTimer rt(tt);
+
+    jac_mat->GetRowMap()->NGs2PETSc(sol, sol_vec);
+    jac_mat->GetRowMap()->NGs2PETSc(rhs, rhs_vec);
+
+    // cout << "SNES RHS: " << endl;
+    // VecView(sol_vec, PETSC_VIEWER_STDOUT_WORLD);
+
+    {
+      RegionTimer rt(tp);
+      SNESSolve(GetSNES(), rhs_vec, sol_vec);
     }
 
     // cout << "SNES SOL: " << sol_vec << endl;
@@ -223,9 +253,12 @@ CONVERT ... Assemble Jacobi matrix, and convert it to a PETSc matrix)raw_string"
 	     py::arg("mode") = PETScSNES::JACOBI_MAT_MODE::FLAT, py::arg("petsc_options") = py::dict()
 	     )
       .def("Finalize", [](shared_ptr<PETScSNES> & snes) { snes->Finalize(); })
-      .def("Solve", [](shared_ptr<PETScSNES> & snes, shared_ptr<ngs::BaseVector> sol) {
-	  snes->Solve(*sol);
-	})
+      .def("Solve", [](shared_ptr<PETScSNES> & snes, shared_ptr<ngs::BaseVector> sol, shared_ptr<ngs::BaseVector> rhs) {
+	  if (rhs != nullptr)
+	    { snes->Solve(*sol, *rhs); }
+	  else
+	    { snes->Solve(*sol); }
+	}, py::arg("sol"), py::arg("rhs") = nullptr)
       .def("GetKSP", [](shared_ptr<PETScSNES> & snes) -> shared_ptr<PETScKSP> {
 	  return snes->GetKSP();
 	});
