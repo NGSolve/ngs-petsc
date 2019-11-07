@@ -547,6 +547,14 @@ namespace ngs_petsc_interface
 	       return pc;
 	     }), py::arg("mat"), py::arg("name") = "", py::arg("petsc_options") = py::dict(),
 	    py::arg("grad_mat") = nullptr);
+#else
+    m.def ("HypreAMSPrecond",
+	   ([](shared_ptr<PETScBaseMatrix> amat, string name, py::dict petsc_options,
+	       shared_ptr<PETScMatrix> grad_mat)
+	    {
+	      throw Exception("NGs-PETSc Interface built without HYPRE Support");
+	    }), py::arg("mat"), py::arg("name") = "", py::arg("petsc_options") = py::dict(),
+	   py::arg("grad_mat") = nullptr);
 #endif
 
     py::class_<PETScFieldSplitPC, shared_ptr<PETScFieldSplitPC>, PETSc2NGsPrecond>

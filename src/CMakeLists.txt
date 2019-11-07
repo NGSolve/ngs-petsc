@@ -8,7 +8,7 @@ add_ngsolve_python_module(libpetscinterface SHARED
 
 include_directories(${PETSC_INCLUDES})
 
-target_link_libraries(libpetscinterface ${PETSC_LIBRARIES})
+target_link_libraries(libpetscinterface PUBLIC ${PETSC_LIBRARIES})
 target_include_directories(libpetscinterface PRIVATE ${PETSC_INCLUDES})
 
 install(TARGETS libpetscinterface DESTINATION ${CMAKE_INSTALL_PREFIX}/ngs_petsc)

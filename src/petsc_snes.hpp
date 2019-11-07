@@ -11,9 +11,9 @@ namespace ngs_petsc_interface
   {
   public:
 
-    enum JACOBI_MAT_MODE : char { APPLY = 0,       // Do not assemble jacobi mat (use ApplyLinearization)
-				  FLAT = 1,        // Assemble Jacobi matrix, but only wrap it to PETSc
-				  CONVERT = 2 };   // Assemble Jacobi matrix, and convert it to a PETSc matrix
+    enum JACOBI_MAT_MODE : uint8_t { APPLY = 0,       // Do not assemble jacobi mat (use ApplyLinearization)
+				     FLAT = 1,        // Assemble Jacobi matrix, but only wrap it to PETSc
+				     CONVERT = 2 };   // Assemble Jacobi matrix, and convert it to a PETSc matrix
 
     PETScSNES (shared_ptr<ngs::BilinearForm> _blf, FlatArray<string> _opts, string _name = "",
 	       shared_ptr<ngs::LocalHeap> _lh = nullptr, JACOBI_MAT_MODE _jac_mode = FLAT);
