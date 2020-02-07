@@ -7,21 +7,19 @@ comm = mpi_world
 
 if comm.rank==0:
     from netgen.geom2d import unit_square
-    ngm = unit_square.GenerateMesh(maxh=0.01)
-    ngm.Distribute(comm)
+    ngm = unit_square.GenerateMesh(maxh=0.05)
+    if comm.size>1:
+        ngm.Distribute(comm)
 else:
     ngm = NGMesh.Receive(comm)
 mesh = Mesh(ngm)
 
-V = VectorH1(mesh, order=4, dirichlet='.*')
+V = H1(mesh, order=1, dirichlet='.*')
 u,v = V.TnT()
 a = BilinearForm(V)
 a += SymbolicBFI(InnerProduct(grad(u),grad(v)))
 f = LinearForm(V)
-if v.dims[0]>1 or len(v.dims)>1:
-    f += SymbolicLFI(v[0] + v[1])
-else:
-    f += SymbolicLFI(v)
+f += SymbolicLFI(v)
 f.Assemble()
 gfu = GridFunction(V)
 # c = Preconditioner(a, 'bddc')
@@ -38,22 +36,8 @@ opts = {"ksp_type":"cg", "ksp_atol":1e-30, "ksp_rtol":1e-8,
 #        "pc_hypre_type" : "boomeramg"}
 #opts = {"ksp_type" : "cg", "ksp_atol" : 1e-30, "ksp_rtol" : 1e-8}
 
-mtdim = v.dims[0] if v.dims[0]>1 else v.dims[1]
-
-gf_one = GridFunction(V)
-kvecs = [gf_one.vec.CreateVector() for k in range(mtdim)]
-if v.dims[0]>1 or len(v.dims)>1:
-    gf_one.Set(CoefficientFunction((1,0)))
-    kvecs[0].data = gf_one.vec
-    gf_one.Set(CoefficientFunction((0,1)))
-    kvecs[1].data = gf_one.vec
-else:
-    gf_one.Set(1)
-    kvecs = [gf_one.vec.CreateVector()]
-    kvecs[0].data = gf_one.vec
     
 mat_wrap = petsc.PETScMatrix(a.mat, freedofs=V.FreeDofs(), format=petsc.PETScMatrix.AIJ)
-mat_wrap.SetNearNullSpace(kvecs)
 #mat_wrap = petsc.FlatPETScMatrix(a.mat, freedofs=V.FreeDofs())
 ksp = petsc.KSP(mat=mat_wrap, name="someksp", petsc_options=opts, finalize=True)
 

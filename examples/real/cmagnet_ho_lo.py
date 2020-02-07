@@ -34,6 +34,7 @@ else:
     from netgen.meshing import Mesh as NGMesh
     ngmesh = NGMesh.Receive(comm)
     ngmesh.SetGeometry(geom)
+ngmesh.Refine()
 mesh = Mesh(ngmesh)
 
 ngsglobals.msg_level = 0
@@ -42,7 +43,7 @@ mesh.Curve(5)
 
 ngsglobals.msg_level = 1
 
-HC = HCurl(mesh, order=3, dirichlet="outer", nograds = False)
+HC = HCurl(mesh, order=1, dirichlet="outer", nograds = False)
 u,v = HC.TnT()
 
 a = BilinearForm(HC, symmetric=False, condense=True)

@@ -75,6 +75,12 @@ def FastEmbed(V_GOAL, V_ORIGIN):
     eblocks = [ x for x in (free_list(V_GOAL.GetDofNrs(e))
                             for e in V_GOAL.mesh.edges) if len(x) ]
     fblocks = [ x for x in (free_list(V_GOAL.GetDofNrs(f)) for f in V_GOAL.mesh.faces) if len(x) ]
+    # cblocks = [ V_GOAL.GetDofNrs(e) for e in V_GOAL.mesh.Elements() ]
+
+    # print('check eblocks')
+    # for block in eblocks:
+    #     b = list(block)
+    #     print( [(x, V_GOAL.CouplingType(x)) for x in b] )
     
     solve_goal = FastInv(agoal.mat, eblocks, fblocks)
 
