@@ -11,4 +11,4 @@ include_directories(${PETSC_INCLUDES})
 target_link_libraries(libpetscinterface PUBLIC ${PETSC_LIBRARIES})
 target_include_directories(libpetscinterface PRIVATE ${PETSC_INCLUDES})
 
-install(TARGETS libpetscinterface DESTINATION ${CMAKE_INSTALL_PREFIX}/ngs_petsc)
+install(TARGETS libpetscinterface DESTINATION ${CMAKE_INSTALL_PREFIX}/${MODULE_NAME})

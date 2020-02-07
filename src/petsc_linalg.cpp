@@ -553,7 +553,9 @@ namespace ngs_petsc_interface
 
   void NGs2PETScVecMap :: AddNGs2PETSc (Complex scal, ngs::BaseVector& ngs_vec, PETScVec petsc_vec)
   {
+#ifdef PETSC_INTERFACE_COMPLEX
     AddNGs2PETSc_impl<Complex>(scal, ngs_vec, petsc_vec);
+#endif
   } // NGs2PETScVecMap :: AddNGs2PETSc
 
 
@@ -598,7 +600,9 @@ namespace ngs_petsc_interface
 
   void NGs2PETScVecMap :: AddPETSc2NGs (Complex scal, ngs::BaseVector& ngs_vec, PETScVec petsc_vec)
   {
+#ifdef PETSC_INTERFACE_COMPLEX
     AddPETSc2NGs_impl<Complex>(scal, ngs_vec, petsc_vec);
+#endif
   } // NGs2PETScVecMap :: AddPETSc2NGs
 
 

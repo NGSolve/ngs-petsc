@@ -1,6 +1,6 @@
 from ngsolve import *
 from netgen.geom2d import SplineGeometry
-import ngs_petsc as petsc
+import ngs_petsc_complex as petsc
 
 geo = SplineGeometry()
 geo.AddRectangle( (-0.1, -0.25), (0.1, 0.25), leftdomain=0, rightdomain=1, bc = "scatterer")
