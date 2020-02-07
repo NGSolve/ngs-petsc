@@ -16,7 +16,12 @@ namespace ngs_petsc_interface
     ptrs.Last() = NULL;
     pchar * pptr = &ptrs[0];
     char** cpptr = (char**)pptr;
+#ifdef USE_SLEPC
+    /** Also calls PetscInitialize **/
+    SlepcInitialize(&argc, &cpptr, NULL, NULL);
+#else
     PetscInitialize(&argc, &cpptr, NULL, NULL);
+#endif
   }
 
 

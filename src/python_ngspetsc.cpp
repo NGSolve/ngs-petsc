@@ -28,6 +28,10 @@ namespace ngs_petsc_interface
   extern void ExportKSP (py::module &m);
   extern void ExportSNES (py::module &m);
 
+#ifdef USE_SLEPC
+  extern void ExportEPS (py::module & m);
+#endif
+  
   PYBIND11_MODULE(libpetscinterface, m)
   {
     static size_t ngp_hs = 1024*1024*10;
@@ -47,6 +51,9 @@ namespace ngs_petsc_interface
     ExportKSP(m);
     ExportSNES(m);
 
+#ifdef USE_SLEPC
+    ExportEPS (m);
+#endif
   }
   
 } // namespace ngs_petsc_interface

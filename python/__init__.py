@@ -17,6 +17,7 @@ libpetscinterface.__all__ += ["KSP"]
 # nmon-linear solver
 libpetscinterface.__all__ += ["SNES"]
 
+libpetscinterface.__all__ += ["EPS"]
 
 from .libpetscinterface import *
 

@@ -5,6 +5,7 @@ cmake_minimum_required(VERSION 3.8)
 
 option (PETSC_WITH_HYPRE "Does PETSc have hypre enabled?" ON)
 option (PETSC_COMPLEX "Are we building the complex version of the interface?" OFF)
+option (USE_SLEPC "Build Interface to SLEPc?" OFF)
 
 set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH}" "${CMAKE_CURRENT_SOURCE_DIR}/cmake/cmake_modules")
 
@@ -38,6 +39,17 @@ if(NOT PETSC_WITH_HYPRE)
 else(NOT PETSC_WITH_HYPRE)
   message(STATUS "Turning ON Hypre Auxiliary space Preconditioners.")
 endif(NOT PETSC_WITH_HYPRE)
+
+if (USE_SLEPC)
+  message(STATUS "Turning ON SLEPc interface.")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_SLEPC")
+  set(SLEPC_LIBRARIES "$ENV{SLEPC_DIR}/lib/libslepc.so")
+else (USE_SLEPC)
+  message(STATUS "Turning OFF SLEPc interface.")
+endif (USE_SLEPC)
+
+message(STATUS "PETSc libraries: ${PETSC_LIBRARIES}")
+message(STATUS "SLEPc libraries: ${SLEPC_LIBRARIES}")
 
 add_subdirectory(src)
 add_subdirectory(python)
