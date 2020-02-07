@@ -108,6 +108,25 @@ namespace ngs_petsc_interface
 
     // Set evaluation of the Jacobian
     SNESSetJacobian(GetSNES(), jac_mat->GetPETScMat(), jac_mat->GetPETScMat(), this->EvaluateJac, (void*)this);
+
+    // Create a DM (DataManagement) shell - workaround for constructing vectors
+    DMShellCreate(comm, &petsc_dm);
+    DMShellSetContext(petsc_dm, this);
+    DMShellSetCreateGlobalVector(petsc_dm, this->CreateDMVec);
+    PETScVec gv = GetColMap()->CreatePETScVector();
+    DMShellSetGlobalVector(petsc_dm, gv);
+
+    // Attach DM to SNES
+    // SNESSetDM(GetSNES(), petsc_dm);
+  }
+
+
+  PetscErrorCode PETScSNES :: CreateDMVec (DM dm, PETScVec* pv)
+  {
+    void* ctx; DMShellGetContext(dm, &ctx);
+    PETScSNES* self = (PETScSNES*)(ctx);
+    *pv = self->GetColMap()->CreatePETScVector();
+    return PetscErrorCode(0);
   }
 
 
@@ -179,6 +198,17 @@ namespace ngs_petsc_interface
   }
 
 
+  shared_ptr<NGs2PETScVecMap> PETScSNES :: GetRowMap () const
+  {
+    return jac_mat->GetRowMap();
+  } // PETScSNES :: GetRowMap
+
+
+  shared_ptr<NGs2PETScVecMap> PETScSNES :: GetColMap () const
+  {
+    return jac_mat->GetColMap();
+  } // PETScSNES :: GetColMap
+
   PetscErrorCode PETScSNES :: EvaluateF (SNES snes, PETScVec x, PETScVec f, void* ctx)
   {
     auto& self = *( (PETScSNES*) ctx);
@@ -221,6 +251,37 @@ namespace ngs_petsc_interface
   }
 
 
+  void PETScSNES :: SetVIBounds (shared_ptr<ngs::BaseVector> low, shared_ptr<ngs::BaseVector> up)
+  {
+    auto col_map = jac_mat->GetColMap();
+
+    if ( (low == nullptr) && (up == nullptr) ) // why bother
+      { return; }
+
+    PETScVec petsc_low = PETSC_NULL, petsc_up = PETSC_NULL;
+
+    /** Convert tp PETSc vectors **/
+    if ( low != nullptr ) {
+      petsc_low = col_map->CreatePETScVector();
+      col_map->NGs2PETSc (*low, petsc_low);
+    }
+    if ( up != nullptr ) {
+      petsc_up = col_map->CreatePETScVector();
+      col_map->NGs2PETSc(*up, petsc_up);
+    }
+
+    /** Set VI bounds  **/
+    SNESVISetVariableBounds(GetSNES(), petsc_low, petsc_up);
+
+    /** Clean up PETSc vectors **/
+    if ( low != nullptr )
+      { VecDestroy(&petsc_low); }
+    if ( up != nullptr )
+      { VecDestroy(&petsc_up); }
+
+  } // PETScSNES::SetVIBounds
+
+
   void ExportSNES (py::module &m)
   {
     extern Array<string> Dict2SA (py::dict & petsc_options);
@@ -251,18 +312,21 @@ CONVERT ... Assemble Jacobi matrix, and convert it to a PETSc matrix)raw_string"
 	     }),
 	     py::arg("blf"), py::arg("name") = string(""), py::arg("finalize") = true,
 	     py::arg("mode") = PETScSNES::JACOBI_MAT_MODE::FLAT, py::arg("petsc_options") = py::dict()
-	     )
-      .def("Finalize", [](shared_ptr<PETScSNES> & snes) { snes->Finalize(); })
-      .def("Solve", [](shared_ptr<PETScSNES> & snes, shared_ptr<ngs::BaseVector> sol, shared_ptr<ngs::BaseVector> rhs) {
-	  if (rhs != nullptr)
-	    { snes->Solve(*sol, *rhs); }
-	  else
-	    { snes->Solve(*sol); }
-	}, py::arg("sol"), py::arg("rhs") = nullptr)
-      .def("GetKSP", [](shared_ptr<PETScSNES> & snes) -> shared_ptr<PETScKSP> {
-	  return snes->GetKSP();
-	});
-    
+	     );
+    snes.def("Finalize", [](shared_ptr<PETScSNES> & snes) { snes->Finalize(); });
+    snes.def("Solve", [](shared_ptr<PETScSNES> & snes, shared_ptr<ngs::BaseVector> sol, shared_ptr<ngs::BaseVector> rhs) {
+	if (rhs != nullptr)
+	  { snes->Solve(*sol, *rhs); }
+	else
+	  { snes->Solve(*sol); }
+      }, py::arg("sol"), py::arg("rhs") = nullptr);
+    snes.def("GetKSP", [](shared_ptr<PETScSNES> & snes) -> shared_ptr<PETScKSP> {
+	return snes->GetKSP();
+      });
+    snes.def("SetVIBounds", [] (shared_ptr<PETScSNES> & snes, shared_ptr<ngs::BaseVector> low, shared_ptr<ngs::BaseVector> up)
+	     {
+	       snes->SetVIBounds(low, up);
+	     }, py::arg("lower") = nullptr, py::arg("upper") = nullptr);
   }
 
 

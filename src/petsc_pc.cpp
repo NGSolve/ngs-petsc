@@ -287,7 +287,7 @@ namespace ngs_petsc_interface
 	for (auto k : Range(spmat->Height())) {
 	  if (subset->Test(k)) {
 	    for (auto j : spmat->GetRowIndices(k))
-	      { h1_subset->Set(j); }
+	      { h1_subset->SetBit(j); }
 	  }
 	}
 	if (fesh1->IsParallel()) {
@@ -300,7 +300,7 @@ namespace ngs_petsc_interface
 	  vec->Cumulate();
 	  size_t add = 0;
 	  for (auto k : Range(fv))
-	    { if (fv[k] != 0) { if (!h1_subset->Test(k)) add++; h1_subset->Set(k); } }
+	    { if (fv[k] != 0) { if (!h1_subset->Test(k)) add++; h1_subset->SetBit(k); } }
 	}
       }
       else

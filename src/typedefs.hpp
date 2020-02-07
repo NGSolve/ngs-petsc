@@ -23,6 +23,14 @@ namespace ngs_petsc_interface
   using PETScPC = ::PC;
   using PETScPCType = ::PCType;
 
+  /** Make syntax consistent **/
+  using PETScScalar = ::PetscScalar;
+  using PETScInt = ::PetscInt;
+
+  static_assert( (is_same<PetscScalar, double>::value || is_same<PetscScalar, ngs::Complex>::value), "Need double or complex PETSc version!");
+  // static_assert( (is_same<PetscScalar, double>::value), "Not a double PETSc version!");
+  // static_assert( (is_same<PetscScalar, ngs::Complex>::value), "Not a complex PETSc version!");
+
 } // namespace ngs_petsc_interface
 
 #endif

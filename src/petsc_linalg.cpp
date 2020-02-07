@@ -4,8 +4,9 @@
 namespace ngs_petsc_interface
 {
 
-  template<class TM> INLINE typename ngs::mat_traits<TM>::TSCAL* get_ptr(TM & val) { return &val(0,0); }
-  template<> INLINE ngs::mat_traits<double>::TSCAL* get_ptr<double>(double & val) { return &val; }
+  template<class TM> INLINE typename ngs::mat_traits<TM>::TSCAL* get_ptr (TM & val) { return &val(0,0); }
+  template<> INLINE double* get_ptr<double> (double & val) { return &val; }
+  template<> INLINE Complex* get_ptr<Complex> (Complex & val) { return &val; }
 
 
   template<class TM>
@@ -14,14 +15,14 @@ namespace ngs_petsc_interface
   {
     static ngs::Timer t(string("SetPETScMatSeq<Mat<") + to_string(ngs::mat_traits<TM>::HEIGHT) + string(">>")); ngs::RegionTimer rt(t);
 
-    PetscInt bs; MatGetBlockSize(petsc_mat, &bs);
+    PETScInt bs; MatGetBlockSize(petsc_mat, &bs);
     if (bs != ngs::mat_traits<TM>::WIDTH) {
       throw Exception(string("Block-Size of petsc-mat (") + to_string(bs) + string(") != block-size of ngs-mat(")
 		      + to_string(ngs::mat_traits<TM>::WIDTH) + string(")"));
     }
 	
     // row map (map for a row)
-    PetscInt bw = ngs::mat_traits<TM>::WIDTH;
+    PETScInt bw = ngs::mat_traits<TM>::WIDTH;
     int nbrow = 0;
     Array<int> row_compress(spmat->Width());
     for (auto k : Range(spmat->Width()))
@@ -29,7 +30,7 @@ namespace ngs_petsc_interface
     int ncols = nbrow * bw;
     
     // col map (map for a col)
-    PetscInt bh = ngs::mat_traits<TM>::HEIGHT;
+    PETScInt bh = ngs::mat_traits<TM>::HEIGHT;
     int nbcol = 0;
     Array<int> col_compress(spmat->Height());
     for (auto k : Range(spmat->Height()))
@@ -40,14 +41,14 @@ namespace ngs_petsc_interface
 
     size_t len_vals = 0;
     for (auto k : Range(spmat->Height())) {
-      PetscInt ck = col_compress[k];
+      PETScInt ck = col_compress[k];
       if (ck != -1) {
 	auto ris = spmat->GetRowIndices(k);
 	auto rvs = spmat->GetRowValues(k);
 	for (auto j : Range(ris.Size())) {
-	  PetscInt cj = row_compress[ris[j]];
+	  PETScInt cj = row_compress[ris[j]];
 	  if (cj != -1) {
-	    PetscScalar* data = get_ptr(rvs[j]);
+	    PETScScalar* data = get_ptr(rvs[j]);
 	    MatSetValuesBlocked(petsc_mat, 1, &ck, 1, &cj, data, INSERT_VALUES);
 	    if (symmetric)
 	      { MatSetValuesBlocked(petsc_mat, 1, &cj, 1, &ck, data, INSERT_VALUES); }
@@ -81,7 +82,7 @@ namespace ngs_petsc_interface
 
     static ngs::Timer t(string("SetPETScMatPar<Mat<") + to_string(ngs::mat_traits<TM>::HEIGHT) + string(">>")); ngs::RegionTimer rt(t);
 
-    PetscInt bs = ngs::mat_traits<TM>::WIDTH;
+    PETScInt bs = ngs::mat_traits<TM>::WIDTH;
 
     auto row_dm = row_map->GetDOFMap();
     auto col_dm = col_map->GetDOFMap();
@@ -89,14 +90,14 @@ namespace ngs_petsc_interface
     MatZeroEntries(petsc_mat);
 
     for (auto k : Range(spmat->Height())) {
-      PetscInt ck = col_dm[k];
+      PETScInt ck = col_dm[k];
       if (ck != -1) {
 	auto ris = spmat->GetRowIndices(k);
 	auto rvs = spmat->GetRowValues(k);
 	for (auto j : Range(ris.Size())) {
-	  PetscInt cj = row_dm[ris[j]];
+	  PETScInt cj = row_dm[ris[j]];
 	  if (cj != -1) {
-	    PetscScalar* data = get_ptr(rvs[j]);
+	    PETScScalar* data = get_ptr(rvs[j]);
 	    MatSetValuesBlocked(petsc_mat, 1, &ck, 1, &cj, data, ADD_VALUES);
 	  }
 	}
@@ -127,7 +128,7 @@ namespace ngs_petsc_interface
     static ngs::Timer t(string("CreatePETScMatSeqBAIJFromSymmetric<Mat<") + to_string(ngs::mat_traits<TM>::HEIGHT) + string(">>")); ngs::RegionTimer rt(t);
 
     // row map (map for a row)
-    PetscInt bw = ngs::mat_traits<TM>::WIDTH;
+    PETScInt bw = ngs::mat_traits<TM>::WIDTH;
     int nbrow = 0;
     Array<int> row_compress(spmat->Width());
     for (auto k : Range(spmat->Width()))
@@ -135,7 +136,7 @@ namespace ngs_petsc_interface
     int ncols = nbrow * bw;
 
     // col map (map for a col)
-    PetscInt bh = ngs::mat_traits<TM>::HEIGHT;
+    PETScInt bh = ngs::mat_traits<TM>::HEIGHT;
     int nbcol = 0;
     Array<int> col_compress(spmat->Height());
     for (auto k : Range(spmat->Height()))
@@ -143,7 +144,7 @@ namespace ngs_petsc_interface
     int nrows = nbcol * bh;
 
     // allocate mat
-    Array<PetscInt> nzepr(nbcol+1); nzepr = 0;
+    Array<PETScInt> nzepr(nbcol+1); nzepr = 0;
     for (auto k : Range(spmat->Height())) {
       auto ck = col_compress[k];
       if (ck != -1) {
@@ -164,7 +165,7 @@ namespace ngs_petsc_interface
     for (auto k : Range(1, nbcol+1))
       { nzepr[k] += nzepr[k-1]; }
     Array<int> cnt(nbcol); cnt = 0;
-    Array<PetscInt> cols(nzepr.Last());
+    Array<PETScInt> cols(nzepr.Last());
     for (auto k : Range(spmat->Height())) {
       auto ck = col_compress[k];
       if (ck != -1) {
@@ -192,7 +193,7 @@ namespace ngs_petsc_interface
 	for (auto j : Range(ris.Size())) {
 	  auto cj = row_compress[ris[j]];
 	  if (cj != -1) {
-	    PetscScalar* data = get_ptr(rvs[j]);
+	    PETScScalar* data = get_ptr(rvs[j]);
 	    cout << "set sym vals " << ck << " " << cj << endl;
 	    MatSetValuesBlocked(petsc_mat, 1, &ck, 1, &cj, data, INSERT_VALUES);
 	    if (cj != ck)
@@ -223,7 +224,7 @@ namespace ngs_petsc_interface
       { return CreatePETScMatSeqBAIJFromSymmetric (sym_spm, rss, css); }
 
     // row map (map for a row)
-    PetscInt bw = ngs::mat_traits<TM>::WIDTH;
+    PETScInt bw = ngs::mat_traits<TM>::WIDTH;
     int nbrow = 0;
     Array<int> row_compress(spmat->Width());
     for (auto k : Range(spmat->Width()))
@@ -231,7 +232,7 @@ namespace ngs_petsc_interface
     int ncols = nbrow * bw;
 
     // col map (map for a col)
-    PetscInt bh = ngs::mat_traits<TM>::HEIGHT;
+    PETScInt bh = ngs::mat_traits<TM>::HEIGHT;
     int nbcol = 0;
     Array<int> col_compress(spmat->Height());
     for (auto k : Range(spmat->Height()))
@@ -239,7 +240,7 @@ namespace ngs_petsc_interface
     int nrows = nbcol * bh;
 
     // allocate mat
-    Array<PetscInt> nzepr(nbcol); nzepr = 0;
+    Array<PETScInt> nzepr(nbcol); nzepr = 0;
     nbcol = 0;
     for (auto k : Range(spmat->Height())) {
       if (!css || css->Test(k)) {
@@ -259,7 +260,7 @@ namespace ngs_petsc_interface
     int n_b_entries = 0;
     for (auto k : Range(nzepr.Size()))
       { n_b_entries += nzepr[k]; }
-    Array<PetscInt> cols(n_b_entries);
+    Array<PETScInt> cols(n_b_entries);
     n_b_entries = 0;
     for (auto k : Range(spmat->Height())) {
       if (!css || css->Test(k)) {
@@ -276,14 +277,14 @@ namespace ngs_petsc_interface
     // vals
     size_t len_vals = 0;
     for (auto k : Range(spmat->Height())) {
-      PetscInt ck = col_compress[k];
+      PETScInt ck = col_compress[k];
       if (ck != -1) {
 	auto ris = spmat->GetRowIndices(k);
 	auto rvs = spmat->GetRowValues(k);
 	for (auto j : Range(ris.Size())) {
-	  PetscInt cj = row_compress[ris[j]];
+	  PETScInt cj = row_compress[ris[j]];
 	  if (cj != -1) {
-	    PetscScalar* data = get_ptr(rvs[j]);
+	    PETScScalar* data = get_ptr(rvs[j]);
 	    MatSetValuesBlocked(petsc_mat, 1, &ck, 1, &cj, data, INSERT_VALUES);
 	  }
 	}
@@ -301,34 +302,34 @@ namespace ngs_petsc_interface
 
   PETScMat CreatePETScMatSeq (shared_ptr<ngs::BaseMatrix> mat, shared_ptr<ngs::BitArray> rss, shared_ptr<ngs::BitArray> css)
   {
-    if (auto spm = dynamic_pointer_cast<ngs::SparseMatrixTM<double>>(mat))
+    if (auto spm = dynamic_pointer_cast<ngs::SparseMatrixTM<PETScScalar>>(mat))
       { return CreatePETScMatSeqBAIJ(spm, rss, css); }
 #if MAX_SYS_DIM>=2
-    if (auto spm = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<2>>>(mat))
+    if (auto spm = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<2, 2, PETScScalar>>>(mat))
       { return CreatePETScMatSeqBAIJ(spm, rss, css); }
 #endif
 #if MAX_SYS_DIM>=3
-    if (auto spm = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<3>>>(mat))
+    if (auto spm = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<3, 3, PETScScalar>>>(mat))
       { return CreatePETScMatSeqBAIJ(spm, rss, css); }
 #endif
 #if MAX_SYS_DIM>=4
-    if (auto spm = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<4>>>(mat))
+    if (auto spm = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<4, 4, PETScScalar>>>(mat))
       { return CreatePETScMatSeqBAIJ(spm, rss, css); }
 #endif
 #if MAX_SYS_DIM>=5
-    if (auto spm = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<5>>>(mat))
+    if (auto spm = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<5, 5, PETScScalar>>>(mat))
       { return CreatePETScMatSeqBAIJ(spm, rss, css); }
 #endif
 #if MAX_SYS_DIM>=6
-    if (auto spm = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<6>>>(mat))
+    if (auto spm = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<6, 6, PETScScalar>>>(mat))
       { return CreatePETScMatSeqBAIJ(spm, rss, css); }
 #endif
 #if MAX_SYS_DIM>=7
-    if (auto spm = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<6>>>(mat))
+    if (auto spm = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<6, 7, PETScScalar>>>(mat))
       { return CreatePETScMatSeqBAIJ(spm, rss, css); }
 #endif
 #if MAX_SYS_DIM>=8
-    if (auto spm = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<6>>>(mat))
+    if (auto spm = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<6, 8, PETScScalar>>>(mat))
       { return CreatePETScMatSeqBAIJ(spm, rss, css); }
 #endif
     throw Exception("Cannot make PETSc-Mat from this NGSolve-Mat!");
@@ -348,14 +349,14 @@ namespace ngs_petsc_interface
 
     static ngs::Timer t(string("DeleteDuplicateValuesTM<Mat<") + to_string(ngs::mat_traits<TM>::HEIGHT) + string(">>")); ngs::RegionTimer rt(t);
 
-    PetscInt bs; MatGetBlockSize(petsc_mat, &bs);
+    PETScInt bs; MatGetBlockSize(petsc_mat, &bs);
     if (bs != ngs::mat_traits<TM>::WIDTH) {
       throw Exception(string("Block-Size of petsc-mat (") + to_string(bs) + string(") != block-size of ngs-mat(")
 		      + to_string(ngs::mat_traits<TM>::WIDTH) + string(")"));
     }
 	
     // row map (map for a row)
-    PetscInt bw = ngs::mat_traits<TM>::WIDTH;
+    PETScInt bw = ngs::mat_traits<TM>::WIDTH;
     int nbrow = 0;
     Array<int> row_compress(spmat->Width());
     for (auto k : Range(spmat->Width()))
@@ -363,7 +364,7 @@ namespace ngs_petsc_interface
     int ncols = nbrow * bw;
     
     // col map (map for a col)
-    PetscInt bh = ngs::mat_traits<TM>::HEIGHT;
+    PETScInt bh = ngs::mat_traits<TM>::HEIGHT;
     int nbcol = 0;
     Array<int> col_compress(spmat->Height());
     for (auto k : Range(spmat->Height()))
@@ -371,7 +372,7 @@ namespace ngs_petsc_interface
     int nrows = nbcol * bh;
     
     TM zero(0);
-    PetscScalar* data = get_ptr(zero);
+    PETScScalar* data = get_ptr(zero);
 
     for (auto k : Range(spmat->Height())) {
       auto ck = col_compress[k];
@@ -394,34 +395,34 @@ namespace ngs_petsc_interface
 			      shared_ptr<ngs::BitArray> rss, shared_ptr<ngs::BitArray> css)
   {
 
-    if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<double>>(mat))
+    if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<PETScScalar>>(mat))
       { DeleteDuplicateValuesTM (petsc_mat, spmat, pdrow, pdcol, rss, css) ; }
 #if MAX_SYS_DIM >= 2
-    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<2,2,double>>>(mat))
+    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<2, 2, PETScScalar>>>(mat))
       { DeleteDuplicateValuesTM (petsc_mat, spmat, pdrow, pdcol, rss, css) ; }
 #endif
 #if MAX_SYS_DIM >= 3
-    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<3,3,double>>>(mat))
+    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<3, 3, PETScScalar>>>(mat))
       { DeleteDuplicateValuesTM (petsc_mat, spmat, pdrow, pdcol, rss, css) ; }
 #endif
 #if MAX_SYS_DIM >= 4
-    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<4,4,double>>>(mat))
+    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<4, 4, PETScScalar>>>(mat))
       { DeleteDuplicateValuesTM (petsc_mat, spmat, pdrow, pdcol, rss, css) ; }
 #endif
 #if MAX_SYS_DIM >= 5
-    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<5,5,double>>>(mat))
+    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<5, 5, PETScScalar>>>(mat))
       { DeleteDuplicateValuesTM (petsc_mat, spmat, pdrow, pdcol, rss, css) ; }
 #endif
 #if MAX_SYS_DIM >= 6
-    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<6,6,double>>>(mat))
+    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<6, 6, PETScScalar>>>(mat))
       { DeleteDuplicateValuesTM (petsc_mat, spmat, pdrow, pdcol, rss, css) ; }
 #endif
 #if MAX_SYS_DIM >=7
-    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<7,7,double>>>(mat))
+    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<7, 7, PETScScalar>>>(mat))
       { DeleteDuplicateValuesTM (petsc_mat, spmat, pdrow, pdcol, rss, css) ; }
 #endif
 #if MAX_SYS_DIM >=8
-    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<8,8,double>>>(mat))
+    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<8, 8, PETScScalar>>>(mat))
       { DeleteDuplicateValuesTM (petsc_mat, spmat, pdrow, pdcol, rss, css) ; }
 #endif
   }
@@ -478,10 +479,10 @@ namespace ngs_petsc_interface
       if (pardofs) {
 	int glob_nd = 0;
 	size_t cnt = 0;
-	Array<PetscInt> compress_globnums(ndof);
+	Array<PETScInt> compress_globnums(ndof);
 	pardofs->EnumerateGlobally(subset, globnums, glob_nd);
 	for (auto k : Range(ndof)) {
-	  dof_map[k] = globnums[k]; // (PetscInt != int is possibe, but EnumerateGlobally only for ints...)
+	  dof_map[k] = globnums[k]; // (PETScInt != int is possibe, but EnumerateGlobally only for ints...)
 	  if (globnums[k] != -1)
 	    { compress_globnums[cnt++] = globnums[k]; }
 	}
@@ -518,9 +519,9 @@ namespace ngs_petsc_interface
   {
     static ngs::Timer t("NGs2PETScVecMap::NGs2PETSc"); ngs::RegionTimer rt(t);
     ngs_vec.Cumulate();
-    PetscScalar * pvs; VecGetArray(petsc_vec, &pvs);
+    PETScScalar * pvs; VecGetArray(petsc_vec, &pvs);
     size_t cnt = 0;
-    auto fv = ngs_vec.FVDouble();
+    auto fv = ngs_vec.FV<PETScScalar>();
     for (auto k : Range(ndof))
       if ( (!pardofs || pardofs->IsMasterDof(k)) && (!subset || subset->Test(k)))
 	for (auto l : Range(bs))
@@ -529,28 +530,41 @@ namespace ngs_petsc_interface
   } // NGs2PETSc
 
 
-  void NGs2PETScVecMap :: AddNGs2PETSc (double scal, ngs::BaseVector& ngs_vec, PETScVec petsc_vec)
+  template<class TSCAL>
+  INLINE void NGs2PETScVecMap :: AddNGs2PETSc_impl (TSCAL scal, ngs::BaseVector& ngs_vec, PETScVec petsc_vec)
   {
     static ngs::Timer t("NGs2PETScVecMap::AddNGs2PETSc"); ngs::RegionTimer rt(t);
     ngs_vec.Cumulate();
-    PetscScalar * pvs; VecGetArray(petsc_vec, &pvs);
+    PETScScalar * pvs; VecGetArray(petsc_vec, &pvs);
     size_t cnt = 0;
-    auto fv = ngs_vec.FVDouble();
+    auto fv = ngs_vec.FV<PETScScalar>();
     for (auto k : Range(ndof))
       if ( (!pardofs || pardofs->IsMasterDof(k)) && (!subset || subset->Test(k)))
 	for (auto l : Range(bs))
 	  { pvs[cnt++] += scal * fv(bs*k+l); }
     VecRestoreArray(petsc_vec, &pvs);
-  } // AddNGs2PETSc
+  } // NGs2PETScVecMap::AddNGs2PETSc
+
+
+  void NGs2PETScVecMap :: AddNGs2PETSc (double scal, ngs::BaseVector& ngs_vec, PETScVec petsc_vec)
+  {
+    AddNGs2PETSc_impl<double>(scal, ngs_vec, petsc_vec);
+  } // NGs2PETScVecMap :: AddNGs2PETSc
+
+
+  void NGs2PETScVecMap :: AddNGs2PETSc (Complex scal, ngs::BaseVector& ngs_vec, PETScVec petsc_vec)
+  {
+    AddNGs2PETSc_impl<Complex>(scal, ngs_vec, petsc_vec);
+  } // NGs2PETScVecMap :: AddNGs2PETSc
 
 
   void NGs2PETScVecMap :: PETSc2NGs (ngs::BaseVector& ngs_vec, PETScVec petsc_vec)
   {
     static ngs::Timer t("NGs2PETScVecMap::PETSc2NGs"); ngs::RegionTimer rt(t);
     ngs_vec.Distribute();
-    const PetscScalar * pvs; VecGetArrayRead(petsc_vec, &pvs);
+    const PETScScalar * pvs; VecGetArrayRead(petsc_vec, &pvs);
     size_t cnt = 0;
-    auto fv = ngs_vec.FVDouble();
+    auto fv = ngs_vec.FV<PETScScalar>();
     for (auto k : Range(ndof))
       if ( (!pardofs || pardofs->IsMasterDof(k)) && (!subset || subset->Test(k)))
 	for (auto l : Range(bs))
@@ -562,27 +576,39 @@ namespace ngs_petsc_interface
   } // PETSc2NGs
 
 
-  void NGs2PETScVecMap :: AddPETSc2NGs (double scal, ngs::BaseVector& ngs_vec, PETScVec petsc_vec)
+  template<class TSCAL>
+  INLINE void NGs2PETScVecMap :: AddPETSc2NGs_impl (TSCAL scal, ngs::BaseVector& ngs_vec, PETScVec petsc_vec)
   {
     static ngs::Timer t("NGs2PETScVecMap::AddPETSc2NGs"); ngs::RegionTimer rt(t);
     ngs_vec.Distribute();
-    const PetscScalar * pvs; VecGetArrayRead(petsc_vec, &pvs);
+    const PETScScalar * pvs; VecGetArrayRead(petsc_vec, &pvs);
     size_t cnt = 0;
-    auto fv = ngs_vec.FVDouble();
+    auto fv = ngs_vec.FV<PETScScalar>();
     for (auto k : Range(ndof))
       if ( (!pardofs || pardofs->IsMasterDof(k)) && (!subset || subset->Test(k)))
 	for (auto l : Range(bs))
 	  { fv(bs*k+l) += scal * pvs[cnt++]; }
     VecRestoreArrayRead(petsc_vec, &pvs);
   } // AddPETSc2NGs
+  
+
+  void NGs2PETScVecMap :: AddPETSc2NGs (double scal, ngs::BaseVector& ngs_vec, PETScVec petsc_vec)
+  {
+    AddPETSc2NGs_impl<double>(scal, ngs_vec, petsc_vec);
+  } // NGs2PETScVecMap :: AddPETSc2NGs
+
+  void NGs2PETScVecMap :: AddPETSc2NGs (Complex scal, ngs::BaseVector& ngs_vec, PETScVec petsc_vec)
+  {
+    AddPETSc2NGs_impl<Complex>(scal, ngs_vec, petsc_vec);
+  } // NGs2PETScVecMap :: AddPETSc2NGs
 
 
   shared_ptr<ngs::BaseVector> NGs2PETScVecMap :: CreateNGsVector () const
   {
     if (pardofs)
-      { return make_shared<ngs::S_ParallelBaseVectorPtr<double>> (pardofs->GetNDofLocal(), pardofs->GetEntrySize(), pardofs, ngs::DISTRIBUTED); }
+      { return make_shared<ngs::S_ParallelBaseVectorPtr<PETScScalar>> (pardofs->GetNDofLocal(), pardofs->GetEntrySize(), pardofs, ngs::DISTRIBUTED); }
     else
-      { return make_shared<ngs::S_BaseVectorPtr<double>> (ndof, bs); }
+      { return make_shared<ngs::S_BaseVectorPtr<PETScScalar>> (ndof, bs); }
   } // CreateNGsVector
 
   PETScVec NGs2PETScVecMap :: CreatePETScVector () const
@@ -732,34 +758,34 @@ namespace ngs_petsc_interface
     auto parmat = dynamic_pointer_cast<ngs::ParallelMatrix>(ngs_mat);
     shared_ptr<BaseMatrix> mat = (parmat == nullptr) ? ngs_mat : parmat->GetMatrix();
 
-    if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<double>>(mat))
+    if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<PETScScalar>>(mat))
       { SetPETScMat (petsc_mat, spmat, GetRowMap(), GetColMap()) ; }
 #if MAX_SYS_DIM >= 2
-    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<2,2,double>>>(mat))
+    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<2, 2, PETScScalar>>>(mat))
       { SetPETScMat (petsc_mat, spmat, GetRowMap(), GetColMap()) ; }
 #endif
 #if MAX_SYS_DIM >= 3
-    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<3,3,double>>>(mat))
+    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<3, 3, PETScScalar>>>(mat))
       { SetPETScMat (petsc_mat, spmat, GetRowMap(), GetColMap()) ; }
 #endif
 #if MAX_SYS_DIM >= 4
-    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<4,4,double>>>(mat))
+    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<4, 4, PETScScalar>>>(mat))
       { SetPETScMat (petsc_mat, spmat, GetRowMap(), GetColMap()) ; }
 #endif
 #if MAX_SYS_DIM >= 5
-    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<5,5,double>>>(mat))
+    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<5, 5, PETScScalar>>>(mat))
       { SetPETScMat (petsc_mat, spmat, GetRowMap(), GetColMap()) ; }
 #endif
 #if MAX_SYS_DIM >= 6
-    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<6,6,double>>>(mat))
+    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<6, 6, PETScScalar>>>(mat))
       { SetPETScMat (petsc_mat, spmat, GetRowMap(), GetColMap()) ; }
 #endif
 #if MAX_SYS_DIM >= 7
-    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<7,7,double>>>(mat))
+    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<7, 7, PETScScalar>>>(mat))
       { SetPETScMat (petsc_mat, spmat, GetRowMap(), GetColMap()) ; }
 #endif
 #if MAX_SYS_DIM >= 8
-    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<8,8,double>>>(mat))
+    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<8, 8, PETScScalar>>>(mat))
       { SetPETScMat (petsc_mat, spmat, GetRowMap(), GetColMap()) ; }
 #endif
     else
@@ -863,14 +889,14 @@ namespace ngs_petsc_interface
       petsc_vecs[k] = map->CreatePETScVector();
       map->NGs2PETSc(*vecs[k], petsc_vecs[k]);
     }
-    Array<double> dots(vecs.Size());
+    Array<PETScScalar> dots(vecs.Size());
     if (!is_orthonormal) {
-      VecNormalize(petsc_vecs[0],NULL);
+      VecNormalize(petsc_vecs[0], NULL);
       for (int i = 1; i < vecs.Size(); i++) {
-	VecMDot(petsc_vecs[i],i,&petsc_vecs[0],&dots[0]);
+	VecMDot(petsc_vecs[i], i, &petsc_vecs[0], &dots[0]);
 	for (int j = 0; j < i; j++) dots[j] *= -1.;
-	VecMAXPY(petsc_vecs[i],i,&dots[0],&petsc_vecs[0]);
-	VecNormalize(petsc_vecs[i],NULL);
+	VecMAXPY(petsc_vecs[i], i, &dots[0], &petsc_vecs[0]);
+	VecNormalize(petsc_vecs[i], NULL);
       }
     }
     MPI_Comm comm;

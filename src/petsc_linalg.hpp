@@ -27,9 +27,12 @@ namespace ngs_petsc_interface
     shared_ptr<ngs::BitArray> GetSubSet () const { return subset; }
 
     void NGs2PETSc (ngs::BaseVector& ngs_vec, PETScVec petsc_vec);
-    void AddNGs2PETSc (double scal, ngs::BaseVector& ngs_vec, PETScVec petsc_vec);
     void PETSc2NGs (ngs::BaseVector& ngs_vec, PETScVec petsc_vec);
+
+    void AddNGs2PETSc (double scal, ngs::BaseVector& ngs_vec, PETScVec petsc_vec);
+    void AddNGs2PETSc (Complex scal, ngs::BaseVector& ngs_vec, PETScVec petsc_vec);
     void AddPETSc2NGs (double scal, ngs::BaseVector& ngs_vec, PETScVec petsc_vec);
+    void AddPETSc2NGs (Complex scal, ngs::BaseVector& ngs_vec, PETScVec petsc_vec);
 
     size_t GetNRowsLocal  () const { return nrows_loc; }
     size_t GetNRowsGlobal () const { return nrows_glob; }
@@ -41,6 +44,11 @@ namespace ngs_petsc_interface
     shared_ptr<ngs::BaseVector> CreateNGsVector () const;
 
   protected:
+
+    template<class TSCAL> INLINE void AddNGs2PETSc_impl (TSCAL scal, ngs::BaseVector& ngs_vec, PETScVec petsc_vec);
+    template<class TSCAL> INLINE void AddPETSc2NGs_impl (TSCAL scal, ngs::BaseVector& ngs_vec, PETScVec petsc_vec);
+
+
     size_t ndof;
     int bs;
     shared_ptr<ngs::ParallelDofs> pardofs;

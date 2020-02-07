@@ -183,12 +183,12 @@ namespace ngs_petsc_interface
 			       auto results = py::dict();
 			       KSPConvergedReason conv_r; KSPGetConvergedReason(ksp, &conv_r);
 			       results["conv_r"] = py::str(name_reason(conv_r));
-			       PetscInt nits; KSPGetIterationNumber(ksp, &nits);
+			       PETScInt nits; KSPGetIterationNumber(ksp, &nits);
 			       results["nits"] = py::int_(nits);
-			       PetscScalar* pr; PetscInt nr; KSPGetResidualHistory(ksp, &pr, &nr); //gets us nr of used res-entries!
+			       PetscReal* pr; PETScInt nr; KSPGetResidualHistory(ksp, &pr, &nr); //gets us nr of used res-entries!
 			       auto py_r_l = py::list(); for (auto k : Range(nr)) py_r_l.append(py::float_(pr[k]));
 			       results["errs"] = py_r_l;
-			       PetscScalar res_n; KSPGetResidualNorm(ksp, &res_n);
+			       PetscReal res_n; KSPGetResidualNorm(ksp, &res_n);
 			       results["res_norm"] =  py::float_(res_n);
 			       PC petsc_prec; KSPGetPC(ksp, &petsc_prec);
 			       PCType pct; PCGetType(petsc_prec, &pct);
