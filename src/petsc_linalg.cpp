@@ -194,7 +194,6 @@ namespace ngs_petsc_interface
 	  auto cj = row_compress[ris[j]];
 	  if (cj != -1) {
 	    PETScScalar* data = get_ptr(rvs[j]);
-	    cout << "set sym vals " << ck << " " << cj << endl;
 	    MatSetValuesBlocked(petsc_mat, 1, &ck, 1, &cj, data, INSERT_VALUES);
 	    if (cj != ck)
 	      { MatSetValuesBlocked(petsc_mat, 1, &cj, 1, &ck, data, INSERT_VALUES); }
