@@ -606,12 +606,12 @@ namespace ngs_petsc_interface
   } // NGs2PETScVecMap :: AddPETSc2NGs
 
 
-  shared_ptr<ngs::BaseVector> NGs2PETScVecMap :: CreateNGsVector () const
+  unique_ptr<ngs::BaseVector> NGs2PETScVecMap :: CreateNGsVector () const
   {
     if (pardofs)
-      { return make_shared<ngs::S_ParallelBaseVectorPtr<PETScScalar>> (pardofs->GetNDofLocal(), pardofs->GetEntrySize(), pardofs, ngs::DISTRIBUTED); }
+      { return make_unique<ngs::S_ParallelBaseVectorPtr<PETScScalar>> (pardofs->GetNDofLocal(), pardofs->GetEntrySize(), pardofs, ngs::DISTRIBUTED); }
     else
-      { return make_shared<ngs::S_BaseVectorPtr<PETScScalar>> (ndof, bs); }
+      { return make_unique<ngs::S_BaseVectorPtr<PETScScalar>> (ndof, bs); }
   } // CreateNGsVector
 
   PETScVec NGs2PETScVecMap :: CreatePETScVector () const

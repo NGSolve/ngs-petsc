@@ -41,7 +41,7 @@ namespace ngs_petsc_interface
     ISLocalToGlobalMapping GetISMap () const;
 
     PETScVec CreatePETScVector () const;
-    shared_ptr<ngs::BaseVector> CreateNGsVector () const;
+    unique_ptr<ngs::BaseVector> CreateNGsVector () const;
 
   protected:
 
