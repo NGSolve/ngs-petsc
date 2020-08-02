@@ -39,10 +39,10 @@ namespace ngs_petsc_interface
     // A = F'(x), B is the matrix used to build the PC used for the linear solve with A
     static PetscErrorCode EvaluateJac (SNES snes, PETScVec x, PETScMat A, PETScMat B, void* ctx);
 
-    static PetscErrorCode CreateDMVec (DM dm, PETScVec* pv);
+    // static PetscErrorCode CreateDMVec (DM dm, PETScVec* pv);
 
     /** Misc. configuration that connot be done by flags **/
-    void SetVIBounds (shared_ptr<ngs::BaseVector> low = nullptr, shared_ptr<ngs::BaseVector> up = nullptr);
+    // void SetVIBounds (shared_ptr<ngs::BaseVector> low = nullptr, shared_ptr<ngs::BaseVector> up = nullptr);
 
   protected:
     shared_ptr<ngs::BilinearForm> blf;
@@ -53,7 +53,7 @@ namespace ngs_petsc_interface
     PETScVec func_vec, sol_vec, rhs_vec;
     shared_ptr<PETScBaseMatrix> jac_mat;
     shared_ptr<ngs::BaseVector> row_vec, col_vec, lin_vec;
-    DM petsc_dm;
+    // DM petsc_dm;
   };
 
 } // namespace ngs_petsc_interface

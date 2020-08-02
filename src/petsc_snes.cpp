@@ -110,24 +110,24 @@ namespace ngs_petsc_interface
     SNESSetJacobian(GetSNES(), jac_mat->GetPETScMat(), jac_mat->GetPETScMat(), this->EvaluateJac, (void*)this);
 
     // Create a DM (DataManagement) shell - workaround for constructing vectors
-    DMShellCreate(comm, &petsc_dm);
-    DMShellSetContext(petsc_dm, this);
-    DMShellSetCreateGlobalVector(petsc_dm, this->CreateDMVec);
-    PETScVec gv = GetColMap()->CreatePETScVector();
-    DMShellSetGlobalVector(petsc_dm, gv);
+    // DMShellCreate(comm, &petsc_dm);
+    // DMShellSetContext(petsc_dm, this);
+    // DMShellSetCreateGlobalVector(petsc_dm, this->CreateDMVec);
+    // PETScVec gv = GetColMap()->CreatePETScVector();
+    // DMShellSetGlobalVector(petsc_dm, gv);
 
     // Attach DM to SNES
     // SNESSetDM(GetSNES(), petsc_dm);
   }
 
 
-  PetscErrorCode PETScSNES :: CreateDMVec (DM dm, PETScVec* pv)
-  {
-    void* ctx; DMShellGetContext(dm, &ctx);
-    PETScSNES* self = (PETScSNES*)(ctx);
-    *pv = self->GetColMap()->CreatePETScVector();
-    return PetscErrorCode(0);
-  }
+  // PetscErrorCode PETScSNES :: CreateDMVec (DM dm, PETScVec* pv)
+  // {
+  //   void* ctx; DMShellGetContext(dm, &ctx);
+  //   PETScSNES* self = (PETScSNES*)(ctx);
+  //   *pv = self->GetColMap()->CreatePETScVector();
+  //   return PetscErrorCode(0);
+  // }
 
 
   PETScSNES :: ~PETScSNES ()
