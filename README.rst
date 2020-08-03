@@ -11,8 +11,3 @@ override this with
 
    cmake -DPETSC_EXECUTABLE_RUNS=YES
 
-If your PETSc installation has beed configured without hypre, you have to tell cmake:
-
-
-   cmake -DPETSC_WITH_HYPRE=OFF
-
