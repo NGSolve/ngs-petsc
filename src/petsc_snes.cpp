@@ -237,7 +237,7 @@ namespace ngs_petsc_interface
     
     if (A && A != B) {
       // reset the shell matrix to its proper state
-      ierr = MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY); CHKERRQ(ierr);
+      auto ierr = MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY); CHKERRQ(ierr);
       ierr = MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY); CHKERRQ(ierr);
     }
     if(B != self.jac_mat->GetPETScMat())
