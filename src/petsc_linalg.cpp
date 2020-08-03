@@ -158,9 +158,9 @@ namespace ngs_petsc_interface
     }
     PETScMat petsc_mat;
     if (bh == 1)
-      { MatCreateSeqAIJ(PETSC_COMM_SELF, nrows, ncols, -1, &nzepr[1], &petsc_mat); }
+      { MatCreateSeqAIJ(PETSC_COMM_SELF, nrows, ncols, 0, &nzepr[1], &petsc_mat); }
     else
-      { MatCreateSeqBAIJ(PETSC_COMM_SELF, bh, nrows, ncols, -1, &nzepr[1], &petsc_mat); }
+      { MatCreateSeqBAIJ(PETSC_COMM_SELF, bh, nrows, ncols, 0, &nzepr[1], &petsc_mat); }
 
     // cols
     for (auto k : Range(1, nbcol+1))
@@ -252,9 +252,9 @@ namespace ngs_petsc_interface
     }
     PETScMat petsc_mat;
     if (bh == 1)
-      { MatCreateSeqAIJ(PETSC_COMM_SELF, nrows, ncols, -1, &nzepr[0], &petsc_mat); }
+      { MatCreateSeqAIJ(PETSC_COMM_SELF, nrows, ncols, 0, &nzepr[0], &petsc_mat); }
     else
-      { MatCreateSeqBAIJ(PETSC_COMM_SELF, bh, nrows, ncols, -1, &nzepr[0], &petsc_mat); }
+      { MatCreateSeqBAIJ(PETSC_COMM_SELF, bh, nrows, ncols, 0, &nzepr[0], &petsc_mat); }
 
     // cols
     int n_b_entries = 0;
