@@ -236,7 +236,7 @@ namespace ngs_petsc_interface
     HeapReset hr(*self.use_lh);
     
     if (A && A != B) {
-      // reset the shell matrix to its proper state
+      // this resets the status of A
       auto ierr = MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY); CHKERRQ(ierr);
       ierr = MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY); CHKERRQ(ierr);
     }
