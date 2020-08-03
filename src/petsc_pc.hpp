@@ -104,7 +104,7 @@ namespace ngs_petsc_interface
     Array<shared_ptr<NGs2PETScPrecond>> keep_alive;
   };
 
-#ifdef PETSC_HAS_HYPRE
+#ifdef PETSC_HAVE_HYPRE
 
   class PETScHypreAuxiliarySpacePC : public PETSc2NGsPrecond
   {
