@@ -235,10 +235,14 @@ namespace ngs_petsc_interface
     auto& self = *( (PETScSNES*) ctx);
     HeapReset hr(*self.use_lh);
     
-    // actually, this happens if snes_mf or snes_mf_operator are set
-    // if(A != self.jac_mat->GetPETScMat()) { throw Exception("A != JAC BUFFER, WTF?"); }
-    if(B != self.jac_mat->GetPETScMat()) { throw Exception("B != JAC BUFFER, WTF?"); }
-    
+    if (A && A != B) {
+      // reset the shell matrix to its proper state
+      ierr = MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY); CHKERRQ(ierr);
+      ierr = MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY); CHKERRQ(ierr);
+    }
+    if(B != self.jac_mat->GetPETScMat())
+      { throw Exception("Mismatching matrices in PETScSNES::EvaluateJac!"); }
+
     self.jac_mat->GetRowMap()->PETSc2NGs(*self.lin_vec, x);
 
     // do not re-allocate matrix !
