@@ -302,38 +302,19 @@ namespace ngs_petsc_interface
 
   PETScMat CreatePETScMatSeq (shared_ptr<ngs::BaseMatrix> mat, shared_ptr<ngs::BitArray> rss, shared_ptr<ngs::BitArray> css)
   {
-    if (auto spm = dynamic_pointer_cast<ngs::SparseMatrixTM<PETScScalar>>(mat))
-      { return CreatePETScMatSeqBAIJ(spm, rss, css); }
-#if MAX_SYS_DIM>=2
-    if (auto spm = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<2, 2, PETScScalar>>>(mat))
-      { return CreatePETScMatSeqBAIJ(spm, rss, css); }
-#endif
-#if MAX_SYS_DIM>=3
-    if (auto spm = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<3, 3, PETScScalar>>>(mat))
-      { return CreatePETScMatSeqBAIJ(spm, rss, css); }
-#endif
-#if MAX_SYS_DIM>=4
-    if (auto spm = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<4, 4, PETScScalar>>>(mat))
-      { return CreatePETScMatSeqBAIJ(spm, rss, css); }
-#endif
-#if MAX_SYS_DIM>=5
-    if (auto spm = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<5, 5, PETScScalar>>>(mat))
-      { return CreatePETScMatSeqBAIJ(spm, rss, css); }
-#endif
-#if MAX_SYS_DIM>=6
-    if (auto spm = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<6, 6, PETScScalar>>>(mat))
-      { return CreatePETScMatSeqBAIJ(spm, rss, css); }
-#endif
-#if MAX_SYS_DIM>=7
-    if (auto spm = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<6, 7, PETScScalar>>>(mat))
-      { return CreatePETScMatSeqBAIJ(spm, rss, css); }
-#endif
-#if MAX_SYS_DIM>=8
-    if (auto spm = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<6, 8, PETScScalar>>>(mat))
-      { return CreatePETScMatSeqBAIJ(spm, rss, css); }
-#endif
-    throw Exception("Cannot make PETSc-Mat from this NGSolve-Mat!");
-    return PETScMat(NULL);
+    PETScMat ret = NULL;
+    Iterate<MAX_SYS_DIM>([&](auto n) {
+	constexpr int N = 1 + n;
+	if constexpr(N==1) {
+	    if (auto spm = dynamic_pointer_cast<ngs::SparseMatrixTM<PETScScalar>>(mat))
+	      { ret = CreatePETScMatSeqBAIJ(spm, rss, css); }
+	  }
+	else {
+	  if (auto spm = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<N, N, PETScScalar>>>(mat))
+	    { ret = CreatePETScMatSeqBAIJ(spm, rss, css); }
+	}
+      });
+    return ret;
   } // CreatePETScMatSeq
 
 
@@ -394,37 +375,17 @@ namespace ngs_petsc_interface
 			      shared_ptr<ngs::ParallelDofs> pdrow, shared_ptr<ngs::ParallelDofs> pdcol,
 			      shared_ptr<ngs::BitArray> rss, shared_ptr<ngs::BitArray> css)
   {
-
-    if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<PETScScalar>>(mat))
-      { DeleteDuplicateValuesTM (petsc_mat, spmat, pdrow, pdcol, rss, css) ; }
-#if MAX_SYS_DIM >= 2
-    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<2, 2, PETScScalar>>>(mat))
-      { DeleteDuplicateValuesTM (petsc_mat, spmat, pdrow, pdcol, rss, css) ; }
-#endif
-#if MAX_SYS_DIM >= 3
-    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<3, 3, PETScScalar>>>(mat))
-      { DeleteDuplicateValuesTM (petsc_mat, spmat, pdrow, pdcol, rss, css) ; }
-#endif
-#if MAX_SYS_DIM >= 4
-    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<4, 4, PETScScalar>>>(mat))
-      { DeleteDuplicateValuesTM (petsc_mat, spmat, pdrow, pdcol, rss, css) ; }
-#endif
-#if MAX_SYS_DIM >= 5
-    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<5, 5, PETScScalar>>>(mat))
-      { DeleteDuplicateValuesTM (petsc_mat, spmat, pdrow, pdcol, rss, css) ; }
-#endif
-#if MAX_SYS_DIM >= 6
-    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<6, 6, PETScScalar>>>(mat))
-      { DeleteDuplicateValuesTM (petsc_mat, spmat, pdrow, pdcol, rss, css) ; }
-#endif
-#if MAX_SYS_DIM >=7
-    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<7, 7, PETScScalar>>>(mat))
-      { DeleteDuplicateValuesTM (petsc_mat, spmat, pdrow, pdcol, rss, css) ; }
-#endif
-#if MAX_SYS_DIM >=8
-    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<8, 8, PETScScalar>>>(mat))
-      { DeleteDuplicateValuesTM (petsc_mat, spmat, pdrow, pdcol, rss, css) ; }
-#endif
+    Iterate<MAX_SYS_DIM>([&](auto n) {
+	constexpr int N = 1 + n;
+	if constexpr(N==1) {
+	    if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<PETScScalar>>(mat))
+	      { DeleteDuplicateValuesTM (petsc_mat, spmat, pdrow, pdcol, rss, css) ; }
+	  }
+	else {
+	  if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<N, N, PETScScalar>>>(mat))
+	    { DeleteDuplicateValuesTM (petsc_mat, spmat, pdrow, pdcol, rss, css) ; }
+	}
+      });
   }
 
 
@@ -758,43 +719,31 @@ namespace ngs_petsc_interface
   {
     static ngs::Timer t("PETScMatrix::UpdateValues"); ngs::RegionTimer rt(t);
 
-    // TODO: if we have converted the matrix from BAIJ to AIJ, is SetValuesBlocked inefficient??
+    // If we have converted the matrix from BAIJ to AIJ, is SetValuesBlocked inefficient??
+    // SZ: answer: it shouldn't be inefficient: it expands by blocksize
+    // the blocked set of indices and then call MatSetValues (thanks Stefano!)
     auto parmat = dynamic_pointer_cast<ngs::ParallelMatrix>(ngs_mat);
     shared_ptr<BaseMatrix> mat = (parmat == nullptr) ? ngs_mat : parmat->GetMatrix();
 
-    if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<PETScScalar>>(mat))
-      { SetPETScMat (petsc_mat, spmat, GetRowMap(), GetColMap()) ; }
-#if MAX_SYS_DIM >= 2
-    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<2, 2, PETScScalar>>>(mat))
-      { SetPETScMat (petsc_mat, spmat, GetRowMap(), GetColMap()) ; }
-#endif
-#if MAX_SYS_DIM >= 3
-    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<3, 3, PETScScalar>>>(mat))
-      { SetPETScMat (petsc_mat, spmat, GetRowMap(), GetColMap()) ; }
-#endif
-#if MAX_SYS_DIM >= 4
-    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<4, 4, PETScScalar>>>(mat))
-      { SetPETScMat (petsc_mat, spmat, GetRowMap(), GetColMap()) ; }
-#endif
-#if MAX_SYS_DIM >= 5
-    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<5, 5, PETScScalar>>>(mat))
-      { SetPETScMat (petsc_mat, spmat, GetRowMap(), GetColMap()) ; }
-#endif
-#if MAX_SYS_DIM >= 6
-    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<6, 6, PETScScalar>>>(mat))
-      { SetPETScMat (petsc_mat, spmat, GetRowMap(), GetColMap()) ; }
-#endif
-#if MAX_SYS_DIM >= 7
-    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<7, 7, PETScScalar>>>(mat))
-      { SetPETScMat (petsc_mat, spmat, GetRowMap(), GetColMap()) ; }
-#endif
-#if MAX_SYS_DIM >= 8
-    else if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<8, 8, PETScScalar>>>(mat))
-      { SetPETScMat (petsc_mat, spmat, GetRowMap(), GetColMap()) ; }
-#endif
-    else
+    bool update_done = false;
+    Iterate<MAX_SYS_DIM>([&](auto n) {
+	constexpr int N = 1 + n;
+	if constexpr(N==1) {
+	    if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<PETScScalar>>(mat)) {
+	      SetPETScMat (petsc_mat, spmat, GetRowMap(), GetColMap());
+	      update_done = true;
+	    }
+	  }
+	else {
+	  if (auto spmat = dynamic_pointer_cast<ngs::SparseMatrixTM<ngs::Mat<N, N, PETScScalar>>>(mat)) {
+	    SetPETScMat (petsc_mat, spmat, GetRowMap(), GetColMap());
+	    update_done = true;
+	  }
+	}
+      });
+    if (!update_done)
       { throw Exception("Can not update values for this kind of mat!!");}
-  }
+  } // PETScMatrix :: UpdateValues
 
 
   FlatPETScMatrix :: FlatPETScMatrix (shared_ptr<ngs::BaseMatrix> _ngs_mat, shared_ptr<ngs::BitArray> _row_subset,
