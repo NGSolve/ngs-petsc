@@ -44,6 +44,8 @@ namespace ngs_petsc_interface
   // };
 
 
+  // SZ
+  // Why do you inherit from FlatPETScMatrix?
   /** An NGSolve-BaseMatrix, wrapped to PETSc as a PC **/
   class NGs2PETScPrecond : public PETScBasePrecond,
 			   public FlatPETScMatrix

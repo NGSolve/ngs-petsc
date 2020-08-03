@@ -101,6 +101,7 @@ namespace ngs_petsc_interface
       { SetOptions (_opts, "", NULL); }
 
     // Create Vector to hold F(x)
+    // SZ: this not strictly needed, since Petsc will create a Vec for you if you pass NULL
     func_vec = jac_mat->GetRowMap()->CreatePETScVector();
 
     // Set (non-linear) function evaluation, f = F(x)
@@ -234,9 +235,18 @@ namespace ngs_petsc_interface
   {
     auto& self = *( (PETScSNES*) ctx);
     HeapReset hr(*self.use_lh);
-    
+
+    // SZ: (do you really want users reading WTF in your code???)
     // actually, this happens if snes_mf or snes_mf_operator are set
     // if(A != self.jac_mat->GetPETScMat()) { throw Exception("A != JAC BUFFER, WTF?"); }
+
+    // SZ: B is the correct choice here. However, I think to cover all possible matrix-free
+    // options, you need to add the following 4 lines (this will reset the shell matrix to its proper state)
+    //
+    //if (A && A != B) {
+    //  ierr = MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
+    //  ierr = MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
+    //}
     if(B != self.jac_mat->GetPETScMat()) { throw Exception("B != JAC BUFFER, WTF?"); }
     
     self.jac_mat->GetRowMap()->PETSc2NGs(*self.lin_vec, x);

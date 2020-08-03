@@ -130,17 +130,22 @@ namespace ngs_petsc_interface
     void Ngs2PETSc (shared_ptr<ngs::BaseVector> ngs_vec, ::Vec petsc_vec)
     {
       ngs_vec->Cumulate();
-      VecAssemblyBegin(petsc_vec);
       auto fv = ngs_vec->FVDouble();
       for (auto k : Range(loc))
   	buf[k] = fv(loc_inds[k]);
       VecSetValues(petsc_vec, loc, &glob_nums[0], &buf[0], INSERT_VALUES);
+      VecAssemblyBegin(petsc_vec);
       VecAssemblyEnd(petsc_vec);
     }
     // petsc -> ngsolve
     void PETSc2Ngs (shared_ptr<ngs::BaseVector> ngs_vec, ::Vec petsc_vec)
     {
       ngs_vec->Distribute();
+      // SZ
+      // This is odd, and rarely used from PETSc. Also, off-processor retrieval is disabled
+      // Can you use VecGetArrayRead/VecRestoreArrayRead semantics?
+      // In alternative, if Ngs2PETSc and PETSc2NGs needs off-process data, you can use
+      // the VecScatter object
       VecGetValues(petsc_vec, loc, &glob_nums[0], &buf[0]);
       auto fv = ngs_vec->FVDouble();
       fv = 0.0;

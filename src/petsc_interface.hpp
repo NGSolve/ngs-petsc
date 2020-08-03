@@ -1,6 +1,11 @@
 
 #include <comp.hpp>
+// SZ
+// consider removing this include from here
 #include "petsc.h"
+
+// SZ
+// why you need python stuff in a C++ interface declaration?
 #include <python_ngstd.hpp> 
 
 #include "typedefs.hpp"

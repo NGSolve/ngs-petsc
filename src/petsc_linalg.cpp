@@ -125,6 +125,7 @@ namespace ngs_petsc_interface
   template<class TM>
   PETScMat CreatePETScMatSeqBAIJFromSymmetric (shared_ptr<ngs::SparseMatrixSymmetric<TM>> spmat, shared_ptr<ngs::BitArray> rss, shared_ptr<ngs::BitArray> css)
   {
+    // SZ: it seems you could interface to SBAIJ too
     static ngs::Timer t(string("CreatePETScMatSeqBAIJFromSymmetric<Mat<") + to_string(ngs::mat_traits<TM>::HEIGHT) + string(">>")); ngs::RegionTimer rt(t);
 
     // row map (map for a row)
@@ -157,6 +158,8 @@ namespace ngs_petsc_interface
     }
     PETScMat petsc_mat;
     if (bh == 1)
+      // SZ: here and in all other similar calls: if you now the nonzero per row, then pass 0 (not -1) as
+      // total number of nonzeros
       { MatCreateSeqAIJ(PETSC_COMM_SELF, nrows, ncols, -1, &nzepr[1], &petsc_mat); }
     else
       { MatCreateSeqBAIJ(PETSC_COMM_SELF, bh, nrows, ncols, -1, &nzepr[1], &petsc_mat); }
@@ -299,6 +302,13 @@ namespace ngs_petsc_interface
   } // CreatePETScMatSeqBAIJ
 
 
+  // SZ
+  // I would not use BAIJ by default if the block size > 2
+  // AIJ is much more supported, BAIJ does not really deliver impressive performances improvements
+  // Some solvers (GAMG, BDDC, FIELDSPLIT) use block size information but this information
+  // is valid for AIJ too, if you use MatSetBlockSize(aijmat,bs);
+  // My suggestion here is to always default to AIJ and provide an extra argument to this
+  // function to instead use blocked formats. BTW, It seems SBAIJ support is missing, am I correct?
   PETScMat CreatePETScMatSeq (shared_ptr<ngs::BaseMatrix> mat, shared_ptr<ngs::BitArray> rss, shared_ptr<ngs::BitArray> css)
   {
     if (auto spm = dynamic_pointer_cast<ngs::SparseMatrixTM<PETScScalar>>(mat))
@@ -758,6 +768,8 @@ namespace ngs_petsc_interface
     static ngs::Timer t("PETScMatrix::UpdateValues"); ngs::RegionTimer rt(t);
 
     // TODO: if we have converted the matrix from BAIJ to AIJ, is SetValuesBlocked inefficient??
+    // SZ: answer: it shouldn't be inefficient: it expands by blocksize
+    // the blocked set of indices and then call MatSetValues
     auto parmat = dynamic_pointer_cast<ngs::ParallelMatrix>(ngs_mat);
     shared_ptr<BaseMatrix> mat = (parmat == nullptr) ? ngs_mat : parmat->GetMatrix();
 

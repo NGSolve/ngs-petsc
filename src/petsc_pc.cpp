@@ -455,6 +455,8 @@ namespace ngs_petsc_interface
 
     // Now set the PCs we already had before
     KSP* ksps; PetscInt n;
+    // SZ: be careful with this function, since those KSPs are different depending on the
+    // fieldsplit type, see the online documentation
     PCFieldSplitGetSubKSP(GetPETScPC(), &n, &ksps);
     for (auto k : Range(fields.Size())) {
       auto field = fields[k];

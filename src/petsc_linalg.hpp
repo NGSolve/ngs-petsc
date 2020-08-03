@@ -4,6 +4,8 @@
 /**
    Matrices / Vectors
 **/
+// SZ
+// See comments about header inclusions in petsc_ksp.hpp
 
 namespace ngs_petsc_interface
 {
@@ -142,6 +144,7 @@ namespace ngs_petsc_interface
       
      Can be any kind of BaseMatrix
   **/
+  // SZ An alternative is to have another Enum value in MAT_TYPE, namely SHELL, and you do not need a special class for it
   class FlatPETScMatrix : public PETScBaseMatrix
   {
   public:

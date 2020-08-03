@@ -98,12 +98,8 @@ namespace ngs_petsc_interface
     KSPSetUp(GetKSP());
 
     petsc_rhs = GetMatrix()->GetRowMap()->CreatePETScVector();
-    // VecAssemblyBegin(petsc_rhs);
-    // VecAssemblyEnd(petsc_rhs);
 
     petsc_sol = GetMatrix()->GetColMap()->CreatePETScVector();
-    // VecAssemblyBegin(petsc_sol);
-    // VecAssemblyEnd(petsc_sol);
   }
 
 

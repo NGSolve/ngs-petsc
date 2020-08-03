@@ -28,6 +28,8 @@ namespace ngs_petsc_interface
 #else
   static_assert( is_same<PetscScalar, double>::value, "Trying to compile the real interface with a complex PETSc installation, (set -DPETSC_COMPLEX=OFF)!");
 #endif
+//SZ
+// Not sure if you support PETSc compiled with 64bit indices
 
   // static_assert( (is_same<PetscScalar, double>::value || is_same<PetscScalar, ngs::Complex>::value), "Need double or complex PETSc version!");
   // static_assert( (is_same<PetscScalar, double>::value), "Not a double PETSc version!");

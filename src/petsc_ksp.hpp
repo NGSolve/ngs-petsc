@@ -1,6 +1,11 @@
 #ifndef FILE_NGSPETSC_KSP_HPP
 #define FILE_NGSPETSC_KSP_HPP
 
+// SZ
+// Each specific hpp file should be able to resolve all the symbols defined in it
+// So, at least for PETSc stuff, you can either include typedefs.hpp or forward declare the needed symbols (KSP, Mat, PC, etc)
+// Since this is a possibly public header, you should avoid including petscksp.h
+
 namespace ngs_petsc_interface
 {
 
