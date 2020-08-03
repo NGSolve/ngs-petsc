@@ -12,6 +12,14 @@ find_package(NGSolve CONFIG REQUIRED
   HINTS $ENV{NETGENDIR}/.. /opt/netgen/ /Applications/Netgen.app/Contents/Resources/CMake C:/netgen
 )
 
+## We cannot set CMAKE_CXX_COMPILER from here, but we can at least throw an error when are using a different
+## compiler than the one used to compile NGSolve
+get_filename_component(CMCXC ${CMAKE_CXX_COMPILER} ABSOLUTE)
+get_filename_component(NGCXC ${NGSOLVE_CXX_COMPILER} ABSOLUTE)
+if(NOT ${CMCXC} STREQUAL ${NGCXC})
+  message(FATAL_ERROR "Please set CMAKE_CXX_COMPILER to ${NGSOLVE_CXX_COMPILER}, which was used to compile NGSolve.")
+endif(NOT ${CMCXC} STREQUAL ${NGCXC})
+
 if(NOT NETGEN_USE_MPI)
   message(FATAL_ERROR "NGSolve version found in ${NGSOLVE_DIR} was not built with MPI support!")
 endif(NOT NETGEN_USE_MPI)
