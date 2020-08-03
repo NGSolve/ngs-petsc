@@ -255,35 +255,35 @@ namespace ngs_petsc_interface
   }
 
 
-  void PETScSNES :: SetVIBounds (shared_ptr<ngs::BaseVector> low, shared_ptr<ngs::BaseVector> up)
-  {
-    auto col_map = jac_mat->GetColMap();
+  // void PETScSNES :: SetVIBounds (shared_ptr<ngs::BaseVector> low, shared_ptr<ngs::BaseVector> up)
+  // {
+  //   auto col_map = jac_mat->GetColMap();
 
-    if ( (low == nullptr) && (up == nullptr) ) // why bother
-      { return; }
+  //   if ( (low == nullptr) && (up == nullptr) ) // why bother
+  //     { return; }
 
-    PETScVec petsc_low = PETSC_NULL, petsc_up = PETSC_NULL;
+  //   PETScVec petsc_low = PETSC_NULL, petsc_up = PETSC_NULL;
 
-    /** Convert tp PETSc vectors **/
-    if ( low != nullptr ) {
-      petsc_low = col_map->CreatePETScVector();
-      col_map->NGs2PETSc (*low, petsc_low);
-    }
-    if ( up != nullptr ) {
-      petsc_up = col_map->CreatePETScVector();
-      col_map->NGs2PETSc(*up, petsc_up);
-    }
+  //   /** Convert tp PETSc vectors **/
+  //   if ( low != nullptr ) {
+  //     petsc_low = col_map->CreatePETScVector();
+  //     col_map->NGs2PETSc (*low, petsc_low);
+  //   }
+  //   if ( up != nullptr ) {
+  //     petsc_up = col_map->CreatePETScVector();
+  //     col_map->NGs2PETSc(*up, petsc_up);
+  //   }
 
-    /** Set VI bounds  **/
-    SNESVISetVariableBounds(GetSNES(), petsc_low, petsc_up);
+  //   /** Set VI bounds  **/
+  //   SNESVISetVariableBounds(GetSNES(), petsc_low, petsc_up);
 
-    /** Clean up PETSc vectors **/
-    if ( low != nullptr )
-      { VecDestroy(&petsc_low); }
-    if ( up != nullptr )
-      { VecDestroy(&petsc_up); }
+  //   /** Clean up PETSc vectors **/
+  //   if ( low != nullptr )
+  //     { VecDestroy(&petsc_low); }
+  //   if ( up != nullptr )
+  //     { VecDestroy(&petsc_up); }
 
-  } // PETScSNES::SetVIBounds
+  // } // PETScSNES::SetVIBounds
 
 
   void ExportSNES (py::module &m)
@@ -327,10 +327,10 @@ CONVERT ... Assemble Jacobi matrix, and convert it to a PETSc matrix)raw_string"
     snes.def("GetKSP", [](shared_ptr<PETScSNES> & snes) -> shared_ptr<PETScKSP> {
 	return snes->GetKSP();
       });
-    snes.def("SetVIBounds", [] (shared_ptr<PETScSNES> & snes, shared_ptr<ngs::BaseVector> low, shared_ptr<ngs::BaseVector> up)
-	     {
-	       snes->SetVIBounds(low, up);
-	     }, py::arg("lower") = nullptr, py::arg("upper") = nullptr);
+  //   snes.def("SetVIBounds", [] (shared_ptr<PETScSNES> & snes, shared_ptr<ngs::BaseVector> low, shared_ptr<ngs::BaseVector> up)
+  // 	     {
+  // 	       snes->SetVIBounds(low, up);
+  // 	     }, py::arg("lower") = nullptr, py::arg("upper") = nullptr);
   }
 
 
