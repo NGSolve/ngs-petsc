@@ -1,5 +1,6 @@
-
 #include "petsc_interface.hpp"
+
+#include <python_ngstd.hpp> 
 
 namespace ngs_petsc_interface
 {

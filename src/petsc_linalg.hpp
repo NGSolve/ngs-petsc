@@ -30,9 +30,9 @@ namespace ngs_petsc_interface
     void PETSc2NGs (ngs::BaseVector& ngs_vec, PETScVec petsc_vec);
 
     void AddNGs2PETSc (double scal, ngs::BaseVector& ngs_vec, PETScVec petsc_vec);
-    void AddNGs2PETSc (Complex scal, ngs::BaseVector& ngs_vec, PETScVec petsc_vec);
+    void AddNGs2PETSc (ngs::Complex scal, ngs::BaseVector& ngs_vec, PETScVec petsc_vec);
     void AddPETSc2NGs (double scal, ngs::BaseVector& ngs_vec, PETScVec petsc_vec);
-    void AddPETSc2NGs (Complex scal, ngs::BaseVector& ngs_vec, PETScVec petsc_vec);
+    void AddPETSc2NGs (ngs::Complex scal, ngs::BaseVector& ngs_vec, PETScVec petsc_vec);
 
     size_t GetNRowsLocal  () const { return nrows_loc; }
     size_t GetNRowsGlobal () const { return nrows_glob; }

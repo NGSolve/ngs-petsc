@@ -31,7 +31,7 @@ namespace ngs_petsc_interface
     virtual void Mult (const ngs::BaseVector & x, ngs::BaseVector & y) const override;
     virtual void MultTransAdd (double val, const ngs::BaseVector & x, ngs::BaseVector & y) const override
     { y = 0; Mult(x,y); y *= val; }
-    virtual void MultTransAdd (Complex val, const ngs::BaseVector & x, ngs::BaseVector & y) const override
+    virtual void MultTransAdd (ngs::Complex val, const ngs::BaseVector & x, ngs::BaseVector & y) const override
     { y = 0; Mult(x,y); y *= val; }
 
     virtual ngs::AutoVector CreateRowVector () const override { return GetMatrix()->GetRowMap()->CreateNGsVector(); }

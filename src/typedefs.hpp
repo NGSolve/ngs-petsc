@@ -9,8 +9,7 @@ namespace ngs_petsc_interface
 #endif
 
   namespace ngs = ngcomp;
-  using ngs::Array;
-  using ngs::Range;
+  using ngs::Array, ngs::Range, ngs::FlatArray, ngs::LocalHeap, ngs::BitArray;
 
 
   using PETScIS = ::IS;
