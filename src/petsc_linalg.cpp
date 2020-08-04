@@ -188,13 +188,13 @@ namespace ngs_petsc_interface
       { MatSeqBAIJSetColumnIndices(petsc_mat, &cols[0]); }
 
     // vals
-    for (auto k : Range(spmat->Height())) {
-      auto ck = col_compress[k];
+    for (auto k : Range(PETScInt(spmat->Height()))) {
+      PETScInt ck = col_compress[k];
       if (ck != -1) {
 	auto ris = spmat->GetRowIndices(k);
 	auto rvs = spmat->GetRowValues(k);
-	for (auto j : Range(ris.Size())) {
-	  auto cj = row_compress[ris[j]];
+	for (PETScInt j : Range(PETScInt(ris.Size()))) {
+	  PETScInt cj = row_compress[ris[j]];
 	  if (cj != -1) {
 	    PETScScalar* data = get_ptr(rvs[j]);
 	    MatSetValuesBlocked(petsc_mat, 1, &ck, 1, &cj, data, INSERT_VALUES);
@@ -358,11 +358,11 @@ namespace ngs_petsc_interface
     PETScScalar* data = get_ptr(zero);
 
     for (auto k : Range(spmat->Height())) {
-      auto ck = col_compress[k];
+      PETScInt ck = col_compress[k];
       if ( (ck == -1) || pdcol->IsMasterDof(k) ) continue;
       auto ri = spmat->GetRowIndices(k);
       for (auto j : Range(ri.Size())) {
-	auto cj = row_compress[ri[j]];
+	PETScInt cj = row_compress[ri[j]];
 	if ( (cj != -1) && !pdrow->IsMasterDof(ri[j]) )
 	  { MatSetValuesBlocked(petsc_mat, 1, &ck, 1, &cj, data, INSERT_VALUES); }
       }
@@ -517,7 +517,7 @@ namespace ngs_petsc_interface
 
   void NGs2PETScVecMap :: AddNGs2PETSc (Complex scal, ngs::BaseVector& ngs_vec, PETScVec petsc_vec)
   {
-#ifdef PETSC_INTERFACE_COMPLEX
+#ifdef PETSC_USE_COMPLEX
     AddNGs2PETSc_impl<Complex>(scal, ngs_vec, petsc_vec);
 #endif
   } // NGs2PETScVecMap :: AddNGs2PETSc
@@ -564,7 +564,7 @@ namespace ngs_petsc_interface
 
   void NGs2PETScVecMap :: AddPETSc2NGs (Complex scal, ngs::BaseVector& ngs_vec, PETScVec petsc_vec)
   {
-#ifdef PETSC_INTERFACE_COMPLEX
+#ifdef PETSC_USE_COMPLEX
     AddPETSc2NGs_impl<Complex>(scal, ngs_vec, petsc_vec);
 #endif
   } // NGs2PETScVecMap :: AddPETSc2NGs
@@ -703,7 +703,7 @@ namespace ngs_petsc_interface
     if (parmat && (parmat->GetOpType() == ngs::PARALLEL_OP::C2C))
       { DeleteDuplicateValues(petsc_mat_loc, spmat, row_pardofs, col_pardofs, row_subset, col_subset); }
     
-    int bs; MatGetBlockSize(petsc_mat_loc, &bs);
+    PETScInt bs; MatGetBlockSize(petsc_mat_loc, &bs);
 
     // Vector conversions
     if (!row_map)

@@ -35,7 +35,7 @@ namespace ngs_petsc_interface
   using PETScScalar = ::PetscScalar;
   using PETScInt = ::PetscInt;
 
-#ifdef PETSC_INTERFACE_COMPLEX
+#ifdef PETSC_USE_COMPLEX
   static_assert( is_same<PetscScalar, ngs::Complex>::value, "Trying to compile the complex interface with a real PETSc installation, (set -DPETSC_COMPLEX=ON)!");
 #else
   static_assert( is_same<PetscScalar, double>::value, "Trying to compile the real interface with a complex PETSc installation, (set -DPETSC_COMPLEX=OFF)!");

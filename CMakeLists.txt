@@ -3,8 +3,6 @@ project(ngspetsc)
 
 cmake_minimum_required(VERSION 3.8)
 
-option (PETSC_COMPLEX "Are we building the complex version of the interface?" OFF)
-
 set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH}" "${CMAKE_CURRENT_SOURCE_DIR}/cmake/cmake_modules")
 
 find_package(NGSolve CONFIG REQUIRED
@@ -30,13 +28,32 @@ if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
   set(CMAKE_INSTALL_PREFIX ${NGSOLVE_INSTALL_DIR}/${NGSOLVE_INSTALL_DIR_PYTHON} CACHE PATH "Install dir" FORCE)
 endif(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
 
+file(WRITE "dummy.cpp" "int main () { return 0; }")
+
+## figure out if the PETSc library is built with complex or real scalars and 32 or 64 bit indices 
+set(CMAKE_TRY_COMPILE_TARGET_TYPE EXECUTABLE)
+try_compile(PETSC_COMPLEX ${CMAKE_BINARY_DIR} "${CMAKE_SOURCE_DIR}/cmake/pcomplex.cpp" CMAKE_FLAGS "-DINCLUDE_DIRECTORIES=${PETSC_INCLUDES}")
+try_compile(PETSC_LONGIND ${CMAKE_BINARY_DIR} "${CMAKE_SOURCE_DIR}/cmake/plongind.cpp" CMAKE_FLAGS "-DINCLUDE_DIRECTORIES=${PETSC_INCLUDES}")
+
+message("PETSC_COMPLEX, ${PETSC_COMPLEX}")
+message("PETSC_LONGIND, ${PETSC_LONGIND}")
+
 if (NOT PETSC_COMPLEX)
-  message(STATUS "Compiling the Real PETSc interface!")
-  set (MODULE_NAME "ngs_petsc")
+  if(NOT PETSC_LONGIND)
+    message(STATUS "Compiling the Real PETSc interface!")
+    set (MODULE_NAME "ngs_petsc")
+  else(NOT PETSC_LONGIND)
+    message(STATUS "Compiling the Real PETSc interface with 64 bit indices!")
+    set (MODULE_NAME "ngs_petsc_longind")
+  endif(NOT PETSC_LONGIND)
 else (NOT PETSC_COMPLEX)
-  message(STATUS "Compiling the Complex PETSc interface!")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DPETSC_INTERFACE_COMPLEX")
-  set (MODULE_NAME "ngs_petsc_complex")
+  if(NOT PETSC_LONGIND)
+    message(STATUS "Compiling the Complex PETSc interface!")
+    set (MODULE_NAME "ngs_petsc_complex")
+  else(NOT PETSC_LONGIND)
+    message(STATUS "Compiling the Complex PETSc interface with 64 bit indices!")
+    set (MODULE_NAME "ngs_petsc_complex_longind")
+  endif(NOT PETSC_LONGIND)
 endif (NOT PETSC_COMPLEX)
 
 add_subdirectory(src)
