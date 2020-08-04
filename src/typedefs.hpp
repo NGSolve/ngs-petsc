@@ -1,6 +1,19 @@
 #ifndef FILE_NGSPETSC_TYPEDEFS_HPP
 #define FILE_NGSPETSC_TYPEDEFS_HPP
 
+// forward declare PETSc stuff so we can get away without including petsc.h
+typedef struct _p_Vec *Vec;
+typedef struct _p_Mat *Mat;
+typedef struct _p_KSP *KSP;
+typedef struct _p_PC *PC;
+typedef struct _p_SNES *SNES;
+typedef struct _p_IS *IS;
+typedef struct _n_PetscOptions *PetscOptions;
+typedef struct _p_ISLocalToGlobalMapping* ISLocalToGlobalMapping;
+typedef struct _p_MatNullSpace* MatNullSpace;
+typedef const char *MatType;
+typedef const char *PCType;
+
 namespace ngs_petsc_interface
 {
 

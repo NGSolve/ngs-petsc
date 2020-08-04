@@ -1,5 +1,6 @@
 #include <comp.hpp>
-#include "petsc.h"
+// #include "petsc.h"
+#include "petscsystypes.h"
 
 #include "typedefs.hpp"
 #include "utils.hpp"
