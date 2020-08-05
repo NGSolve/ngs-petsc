@@ -8,7 +8,12 @@ add_ngsolve_python_module(libpetscinterface SHARED
 
 include_directories(${PETSC_INCLUDES})
 
+set_target_properties(libpetscinterface PROPERTIES PUBLIC_HEADER "petsc_interface.hpp;petsc_linalg.hpp;petsc_pc.hpp;petsc_ksp.hpp;petsc_snes.hpp;utils.hpp;typedefs.hpp")
+
 target_link_libraries(libpetscinterface PUBLIC ${PETSC_LIBRARIES})
 target_include_directories(libpetscinterface PRIVATE ${PETSC_INCLUDES})
 
-install(TARGETS libpetscinterface DESTINATION ${CMAKE_INSTALL_PREFIX}/${MODULE_NAME})
+install(TARGETS libpetscinterface LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/${MODULE_NAME}
+  PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_PREFIX}/${MODULE_NAME}/include )
+
+# install(FILES petsc_interface.hpp petsc_linalg.hpp petsc_pc.hpp petsc_ksp.hpp petsc_snes.hpp utils.hpp typedefs.hpp DESTINATION ${CMAKE_INSTALL_PREFIX}/${MODULE_NAME}/include)
