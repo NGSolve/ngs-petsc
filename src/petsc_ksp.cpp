@@ -155,6 +155,7 @@ namespace ngs_petsc_interface
 	   py::arg("mat"), py::arg("name") = string(""), py::arg("finalize") = true,
 	   py::arg("petsc_options") = py::dict()
 	   )
+#ifdef PETSC_HAVE_HYPRE
       .def("AttachHypreData", [](shared_ptr<PETScKSP> & ksp, shared_ptr<PETScBaseMatrix> & grad_mat,
 				 py::list py_const_vecs) {
 	  auto petsc_ksp = ksp->GetKSP();
@@ -172,6 +173,7 @@ namespace ngs_petsc_interface
 	  PCHYPRESetEdgeConstantVectors(pc, ozz, zoz, zzo);
 
 	   }, py::arg("grad_mat"), py::arg("xyz_const_vecs"))
+#endif // PETSC_HAVE_HYPRE
       .def("GetMatrix", [](shared_ptr<PETScKSP> & ksp) { return ksp->GetMatrix(); } )
       .def("SetPC", [](shared_ptr<PETScKSP> & aksp, shared_ptr<PETScBasePrecond> & apc) {
 	  aksp->SetPC(apc);
