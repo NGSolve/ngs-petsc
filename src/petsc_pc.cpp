@@ -2,11 +2,10 @@
 
 #include "petsc.h"
 
-#include <python_ngstd.hpp> 
-
 namespace ngs_petsc_interface
 {
 
+  using namespace ngstd;
 
   PETScBasePrecond :: PETScBasePrecond (MPI_Comm comm, string _name, FlatArray<string> _petsc_options)
   {
@@ -478,9 +477,24 @@ namespace ngs_petsc_interface
   ngs::RegisterPreconditioner<PETScHypreAMS> registerPETScHypreAMS("petsc_pc_hypre_ams");
 #endif
 
+} // namespace ngs_petsc_interface
+
+#include "python_ngspetsc.hpp"
+#include <python_ngstd.hpp> // has to come after python_ngspetsc because of scope issues 
+
+
+#ifdef PETSc4Py_INTERFACE
+DECLARE_PB_TYPECASTER(ngs_petsc_interface::PETScPC, PyPetscPC_Type, PyPetscPC_New, PyPetscPC_Get, "PETScPC");
+#endif // PETSc4Py_INTERFACE
+
+namespace ngs_petsc_interface {
 
   void ExportPC (py::module & m)
   {
+#ifdef PETSc4Py_INTERFACE
+    ::import_petsc4py();
+#endif //  PETSc4Py_INTERFACE
+
     extern Array<string> Dict2SA (py::dict & petsc_options);
 
     py::class_<PETScBasePrecond, shared_ptr<PETScBasePrecond>>

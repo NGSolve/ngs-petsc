@@ -2,10 +2,11 @@
 
 #include "petsc.h"
 
-#include <python_ngstd.hpp> 
-
 namespace ngs_petsc_interface
 {
+
+  using namespace ngstd;
+
   INLINE string name_reason (SNESConvergedReason r) {
     switch(r) {
     case(SNES_CONVERGED_FNORM_ABS     ): return "SNES_CONVERGED_FNORM_ABS";
@@ -288,9 +289,24 @@ namespace ngs_petsc_interface
 
   // } // PETScSNES::SetVIBounds
 
+} // namespace ngs_petsc_interface
+
+#include "python_ngspetsc.hpp"
+#include <python_ngstd.hpp> // has to come after python_ngspetsc because of scope issues 
+
+
+#ifdef PETSc4Py_INTERFACE
+DECLARE_PB_TYPECASTER(SNES, PyPetscSNES_Type, PyPetscSNES_New, PyPetscSNES_Get, "SNES");
+#endif // PETSc4Py_INTERFACE
+
+namespace ngs_petsc_interface {
 
   void ExportSNES (py::module &m)
   {
+#ifdef PETSc4Py_INTERFACE
+    ::import_petsc4py();
+#endif //  PETSc4Py_INTERFACE
+
     extern Array<string> Dict2SA (py::dict & petsc_options);
 
     auto snes = py::class_<PETScSNES, shared_ptr<PETScSNES>>

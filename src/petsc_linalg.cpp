@@ -4,6 +4,7 @@
 
 namespace ngs_petsc_interface
 {
+
   using namespace ngstd;
 
   template<class TM> INLINE typename ngs::mat_traits<TM>::TSCAL* get_ptr (TM & val) { return &val(0,0); }
@@ -872,28 +873,10 @@ namespace ngs_petsc_interface
 
 
 #ifdef PETSc4Py_INTERFACE
-struct PETScMat_holder
-{
-  PETScMat_holder () = default;
-  PETScMat_holder(ngs_petsc_interface::PETScMat _value) : value(_value) { ; }
-  operator PETScMat_holder () { return value; }
-  ngs_petsc_interface::PETScMat value;
-};
-template<> class petsc4py_trait<PETScMat_holder> {
-public:
-  // static ngs_petsc_interface::PETScMat P2C (PyObject* pyob) { return PyPetscMat_Get(pyob); }
-  static PyObject* C2P (PETScMat_holder cob) { return PyPetscMat_New(cob.value); }
-  // static constexpr const char* tcname = "PETScMat";
-};
-// DECLARE_PB_TYPECASTER(ngs_petsc_interface::PETScMat);
-DECLARE_PB_TYPECASTER(PETScMat_holder, "PETScMat");
-template<> class petsc4py_trait<ngs_petsc_interface::PETScVec> {
-public:
-  // static ngs_petsc_interface::PETScVec P2C (PyObject* pyob) { return PyPetscVec_Get(pyob); }
-  static PyObject* C2P (ngs_petsc_interface::PETScVec cob) { return PyPetscVec_New(cob); }
-  // static constexpr const char* tcname = "PETScVec";
-};
-DECLARE_PB_TYPECASTER(ngs_petsc_interface::PETScVec, "PETScVec");
+DECLARE_PB_TYPECASTER(ngs_petsc_interface::PETScMat, PyPetscMat_Type, PyPetscMat_New, PyPetscMat_Get, "PETScMat");
+DECLARE_PB_TYPECASTER(ngs_petsc_interface::PETScVec, PyPetscVec_Type, PyPetscVec_New, PyPetscVec_Get, "PETScVec");
+DECLARE_PB_TYPECASTER(IS, PyPetscIS_Type, PyPetscIS_New, PyPetscIS_Get, "PETScIS");
+DECLARE_PB_TYPECASTER(ISLocalToGlobalMapping, PyPetscLGMap_Type, PyPetscLGMap_New, PyPetscLGMap_Get, "PETScISLocalToGlobalMapping");
 #endif // PETSc4Py_INTERFACE
 
 namespace ngs_petsc_interface {
@@ -902,9 +885,23 @@ namespace ngs_petsc_interface {
   {
 #ifdef PETSc4Py_INTERFACE
     ::import_petsc4py();
-
-    // py::implicitly_convertible<PETScMat_holder, PETScMat>();
 #endif //  PETSc4Py_INTERFACE
+
+#ifdef PETSc4Py_INTERFACE
+    py::class_<NGs2PETScVecMap, shared_ptr<NGs2PETScVecMap>>
+      (m, "NGs2PETScVecMap", "Can convert between NGSolve and PETSc vectors")
+      .def("NGs2PETSc", [&](shared_ptr<NGs2PETScVecMap> vmap, shared_ptr<ngs::BaseVector> nvec, pbholder<PETScVec> pvec) { vmap->NGs2PETSc(*nvec, pvec.value); } )
+      .def("AddNGs2PETSc", [&](shared_ptr<NGs2PETScVecMap> vmap, double scal, shared_ptr<ngs::BaseVector> nvec, pbholder<PETScVec> pvec) { vmap->AddNGs2PETSc(scal, *nvec, pvec.value); } )
+      .def("AddNGs2PETSc", [&](shared_ptr<NGs2PETScVecMap> vmap, ngs::Complex scal, shared_ptr<ngs::BaseVector> nvec, pbholder<PETScVec> pvec) { vmap->AddNGs2PETSc(scal, *nvec, pvec.value); } )
+      .def("PETSc2NGs", [&](shared_ptr<NGs2PETScVecMap> vmap, shared_ptr<ngs::BaseVector> nvec, pbholder<PETScVec> pvec) { vmap->PETSc2NGs(*nvec, pvec.value); } )
+      .def("AddPETSc2NGs", [&](shared_ptr<NGs2PETScVecMap> vmap, double scal, shared_ptr<ngs::BaseVector> nvec, pbholder<PETScVec> pvec) { vmap->AddPETSc2NGs(scal, *nvec, pvec.value); } )
+      .def("AddPETSc2NGs", [&](shared_ptr<NGs2PETScVecMap> vmap, ngs::Complex scal, shared_ptr<ngs::BaseVector> nvec, pbholder<PETScVec> pvec) { vmap->AddPETSc2NGs(scal, *nvec, pvec.value); } )
+      .def("GetLGMap", [&](shared_ptr<NGs2PETScVecMap> & vmap) { return pbholder<ISLocalToGlobalMapping>(vmap->GetISMap()); })
+      .def("CreateNGsVector", [](shared_ptr<NGs2PETScVecMap> & vec) { return vec->CreateNGsVector(); })
+      .def("CreatePETScVector", [](shared_ptr<NGs2PETScVecMap> & vec) { return pbholder<PETScVec>(vec->CreatePETScVector()); })
+      ;
+#endif // PETSc4Py_INTERFACE
+
 
     py::class_<PETScBaseMatrix, shared_ptr<PETScBaseMatrix>, ngs::BaseMatrix>
       (m, "PETScBaseMatrix", "Can be used as an NGSolve- or as a PETSc- Matrix")
@@ -917,16 +914,13 @@ namespace ngs_petsc_interface {
 	  mat->SetNearNullSpace(NullSpaceCreate(kvecs, mat->GetRowMap()));
 	}, py::arg("kvecs"))
 #ifdef PETSc4Py_INTERFACE
-      // .def("GetPETScMat", [](shared_ptr<PETScBaseMatrix> & mat) -> py::object {
-	  // return py::reinterpret_steal<py::object>(PyPetscMat_New(mat->GetPETScMat()));
-	// } )
-      // .def("GetPETScMat", [](shared_ptr<PETScBaseMatrix> & mat) { return py::detail::type_caster<PETScMat>::cast(mat->GetPETScMat()); })
-      .def("GetPETScMat", [](shared_ptr<PETScBaseMatrix> & mat) { return PETScMat_holder(mat->GetPETScMat()); })
+      .def("GetPETScMat", [](shared_ptr<PETScBaseMatrix> & mat) { return pbholder<PETScMat>(mat->GetPETScMat()); })
+      .def("GetRowMap", [](shared_ptr<PETScBaseMatrix> & mat) { return mat->GetRowMap(); })
+      .def("GetColMap", [](shared_ptr<PETScBaseMatrix> & mat) { return mat->GetColMap(); })
 #endif // PETSc4Py_INTERFACE
       ;
     
-
-    auto pcm = py::class_<PETScMatrix, shared_ptr<PETScMatrix>, PETScBaseMatrix>
+  auto pcm = py::class_<PETScMatrix, shared_ptr<PETScMatrix>, PETScBaseMatrix>
       (m, "PETScMatrix", "PETSc matrix, converted from an NGSolve-matrix");
 
     py::enum_<PETScMatrix::MAT_TYPE>

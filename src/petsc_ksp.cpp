@@ -2,10 +2,10 @@
 
 #include "petsc.h"
 
-#include <python_ngstd.hpp> 
-
 namespace ngs_petsc_interface
 {
+
+  using namespace ngstd;
 
   INLINE string name_reason (KSPConvergedReason r) {
     switch(r)
@@ -124,9 +124,24 @@ namespace ngs_petsc_interface
 
   }
 
+} // namespace ngs_petsc_interface
+
+#include "python_ngspetsc.hpp"
+#include <python_ngstd.hpp> // has to come after python_ngspetsc because of scope issues 
+
+
+#ifdef PETSc4Py_INTERFACE
+DECLARE_PB_TYPECASTER(KSP, PyPetscKSP_Type, PyPetscKSP_New, PyPetscKSP_Get, "KSP");
+#endif // PETSc4Py_INTERFACE
+
+namespace ngs_petsc_interface {
   
   void ExportKSP (py::module &m)
   {
+#ifdef PETSc4Py_INTERFACE
+    ::import_petsc4py();
+#endif //  PETSc4Py_INTERFACE
+
     extern Array<string> Dict2SA (py::dict & petsc_options);
 
     py::class_<PETScKSP, shared_ptr<PETScKSP>, ngs::BaseMatrix>
@@ -196,7 +211,11 @@ namespace ngs_petsc_interface
 			       PCType pct; PCGetType(petsc_prec, &pct);
 			       results["pc_used"] = py::str(string(pct));
 			       return results;
-			     });
+			     })
+#ifdef PETSc4Py_INTERFACE
+      .def("GetKSP", [](shared_ptr<PETScKSP> & ksp) { return pbholder<KSP>(ksp->GetKSP()); })
+#endif //  PETSc4Py_INTERFACE
+      ;
   } // ExportKSP
 
 } // namespace ngs_petsc_interface
