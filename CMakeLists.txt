@@ -3,6 +3,8 @@ project(ngspetsc)
 
 cmake_minimum_required(VERSION 3.8)
 
+option( WITH_PETSC4PY     "Build interface to petsc4py" OFF )
+
 set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH}" "${CMAKE_CURRENT_SOURCE_DIR}/cmake/cmake_modules")
 
 find_package(NGSolve CONFIG REQUIRED
@@ -35,8 +37,8 @@ set(CMAKE_TRY_COMPILE_TARGET_TYPE EXECUTABLE)
 try_compile(PETSC_COMPLEX ${CMAKE_BINARY_DIR} "${CMAKE_SOURCE_DIR}/cmake/pcomplex.cpp" CMAKE_FLAGS "-DINCLUDE_DIRECTORIES=${PETSC_INCLUDES}")
 # try_compile(PETSC_LONGIND ${CMAKE_BINARY_DIR} "${CMAKE_SOURCE_DIR}/cmake/plongind.cpp" CMAKE_FLAGS "-DINCLUDE_DIRECTORIES=${PETSC_INCLUDES}")
 
-message("PETSC_COMPLEX, ${PETSC_COMPLEX}")
-# message("PETSC_LONGIND, ${PETSC_LONGIND}")
+# message(STATUS "PETSC_COMPLEX, ${PETSC_COMPLEX}")
+# message(STATUS "PETSC_LONGIND, ${PETSC_LONGIND}")
 
 if (NOT PETSC_COMPLEX)
   # if(NOT PETSC_LONGIND)
@@ -55,6 +57,17 @@ else (NOT PETSC_COMPLEX)
     # set (MODULE_NAME "ngs_petsc_complex_longind")
   # endif(NOT PETSC_LONGIND)
 endif (NOT PETSC_COMPLEX)
+
+if (WITH_PETSC4PY)
+  message(STATUS "petsc4py support is turned ON, looking for include directory...")
+  execute_process (COMMAND python3 -c "exec('import petsc4py\\nprint(petsc4py.get_include(), end=\"\")')" RESULT_VARIABLE theresult OUTPUT_VARIABLE PETSC4PY_DIR)
+  find_path(PETSC4PY_INCLUDES petsc4py.h HINTS ${PETSC4PY_DIR}/petsc4py NO_DEFAULT_PATH REQUIRED)
+  message(STATUS "petsc4py include directory is ${PETSC4PY_INCLUDES}")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DPETSc4Py_INTERFACE")
+else (WITH_PETSC4PY)
+  message(STATUS "petsc4py support is turned OFF")
+  set(PETSC4PY_INCLUDES "")
+endif (WITH_PETSC4PY)
 
 add_subdirectory(src)
 add_subdirectory(python)

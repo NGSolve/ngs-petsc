@@ -2,6 +2,8 @@
 
 #include "petsc.h"
 
+#include "python_ngspetsc.hpp" 
+
 #include <python_ngstd.hpp> 
 
 namespace ngs_petsc_interface
@@ -24,7 +26,6 @@ namespace ngs_petsc_interface
     return opt_array;
   };
 
-  
   extern void ExportUtils (py::module &m);
   extern void ExportLinAlg (py::module &m);
   extern void ExportPC (py::module & m);
@@ -33,6 +34,10 @@ namespace ngs_petsc_interface
 
   PYBIND11_MODULE(libpetscinterface, m)
   {
+#ifdef PETSc4Py_INTERFACE
+    ::import_petsc4py();
+#endif //  PETSc4Py_INTERFACE
+
     static size_t ngp_hs = 1024*1024*10;
     static shared_ptr<LocalHeap> ngp_lh = make_shared<LocalHeap>(ngp_hs, "NGs-PETSc Interface lh", true);
 
@@ -53,3 +58,4 @@ namespace ngs_petsc_interface
   }
   
 } // namespace ngs_petsc_interface
+

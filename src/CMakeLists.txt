@@ -6,7 +6,7 @@ add_ngsolve_python_module(libpetscinterface SHARED
     python_ngspetsc.cpp utils.cpp petsc_linalg.cpp petsc_pc.cpp
     petsc_ksp.cpp petsc_snes.cpp)
 
-include_directories(${PETSC_INCLUDES})
+include_directories(${PETSC_INCLUDES} ${PETSC4PY_INCLUDES})
 
 set_target_properties(libpetscinterface PROPERTIES PUBLIC_HEADER "petsc_interface.hpp;petsc_linalg.hpp;petsc_pc.hpp;petsc_ksp.hpp;petsc_snes.hpp;utils.hpp;typedefs.hpp")
 

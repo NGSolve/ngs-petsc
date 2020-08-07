@@ -2,10 +2,9 @@
 
 #include "petsc.h"
 
-#include <python_ngstd.hpp> 
-
 namespace ngs_petsc_interface
 {
+  using namespace ngstd;
 
   template<class TM> INLINE typename ngs::mat_traits<TM>::TSCAL* get_ptr (TM & val) { return &val(0,0); }
   template<> INLINE double* get_ptr<double> (double & val) { return &val; }
@@ -865,9 +864,47 @@ namespace ngs_petsc_interface
     return ns;
   } // NullSpaceCreate
 
+} // namespace ngs_petsc_interface
 
+
+#include "python_ngspetsc.hpp"
+#include <python_ngstd.hpp> // has to come after python_ngspetsc because of scope issues 
+
+
+#ifdef PETSc4Py_INTERFACE
+struct PETScMat_holder
+{
+  PETScMat_holder () = default;
+  PETScMat_holder(ngs_petsc_interface::PETScMat _value) : value(_value) { ; }
+  operator PETScMat_holder () { return value; }
+  ngs_petsc_interface::PETScMat value;
+};
+template<> class petsc4py_trait<PETScMat_holder> {
+public:
+  // static ngs_petsc_interface::PETScMat P2C (PyObject* pyob) { return PyPetscMat_Get(pyob); }
+  static PyObject* C2P (PETScMat_holder cob) { return PyPetscMat_New(cob.value); }
+  // static constexpr const char* tcname = "PETScMat";
+};
+// DECLARE_PB_TYPECASTER(ngs_petsc_interface::PETScMat);
+DECLARE_PB_TYPECASTER(PETScMat_holder, "PETScMat");
+template<> class petsc4py_trait<ngs_petsc_interface::PETScVec> {
+public:
+  // static ngs_petsc_interface::PETScVec P2C (PyObject* pyob) { return PyPetscVec_Get(pyob); }
+  static PyObject* C2P (ngs_petsc_interface::PETScVec cob) { return PyPetscVec_New(cob); }
+  // static constexpr const char* tcname = "PETScVec";
+};
+DECLARE_PB_TYPECASTER(ngs_petsc_interface::PETScVec, "PETScVec");
+#endif // PETSc4Py_INTERFACE
+
+namespace ngs_petsc_interface {
+  
   void ExportLinAlg (py::module &m)
   {
+#ifdef PETSc4Py_INTERFACE
+    ::import_petsc4py();
+
+    // py::implicitly_convertible<PETScMat_holder, PETScMat>();
+#endif //  PETSc4Py_INTERFACE
 
     py::class_<PETScBaseMatrix, shared_ptr<PETScBaseMatrix>, ngs::BaseMatrix>
       (m, "PETScBaseMatrix", "Can be used as an NGSolve- or as a PETSc- Matrix")
@@ -878,7 +915,15 @@ namespace ngs_petsc_interface
       .def("SetNearNullSpace", [](shared_ptr<PETScBaseMatrix> & mat, py::list py_kvecs) {
 	  Array<shared_ptr<ngs::BaseVector>> kvecs = makeCArray<shared_ptr<ngs::BaseVector>>(py_kvecs);
 	  mat->SetNearNullSpace(NullSpaceCreate(kvecs, mat->GetRowMap()));
-	}, py::arg("kvecs"));
+	}, py::arg("kvecs"))
+#ifdef PETSc4Py_INTERFACE
+      // .def("GetPETScMat", [](shared_ptr<PETScBaseMatrix> & mat) -> py::object {
+	  // return py::reinterpret_steal<py::object>(PyPetscMat_New(mat->GetPETScMat()));
+	// } )
+      // .def("GetPETScMat", [](shared_ptr<PETScBaseMatrix> & mat) { return py::detail::type_caster<PETScMat>::cast(mat->GetPETScMat()); })
+      .def("GetPETScMat", [](shared_ptr<PETScBaseMatrix> & mat) { return PETScMat_holder(mat->GetPETScMat()); })
+#endif // PETSc4Py_INTERFACE
+      ;
     
 
     auto pcm = py::class_<PETScMatrix, shared_ptr<PETScMatrix>, PETScBaseMatrix>
