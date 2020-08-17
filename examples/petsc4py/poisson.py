@@ -2,12 +2,12 @@ from mpi4py import MPI
 from ngsolve import *
 import petsc4py.PETSc as psc
 import ngs_petsc as ngp
-# import sys
+import netgen.meshing
 
 comm = MPI.COMM_WORLD
 
-from netgen.geom2d import unit_square
 if comm.rank==0:
+    from netgen.geom2d import unit_square
     mesh = Mesh(unit_square.GenerateMesh(maxh=0.05).Distribute(comm))
 else:
     mesh = Mesh(netgen.meshing.Mesh.Receive(comm))
@@ -57,4 +57,3 @@ if comm.rank==0:
 
 # only available in sequential mode
 Draw(gfu, name='sol')
-
