@@ -8,10 +8,9 @@ comm = MPI.COMM_WORLD
 
 if comm.rank==0:
     from netgen.geom2d import unit_square
-    mesh = Mesh(unit_square.GenerateMesh(maxh=0.05).Distribute(comm))
+    mesh = Mesh(unit_square.GenerateMesh(maxh=0.005).Distribute(comm))
 else:
     mesh = Mesh(netgen.meshing.Mesh.Receive(comm))
-
     
 V = H1(mesh, order=1, dirichlet='.*')
 u,v = V.TnT()
@@ -20,11 +19,9 @@ f = LinearForm(1*v*dx).Assemble()
 
 gfu = GridFunction(V)
 
-wrapped_mat = ngp.PETScMatrix(a.mat, freedofs=V.FreeDofs()) 
-p4p_mat = wrapped_mat.GetPETScMat()
+p4p_mat = ngp.PETScMatrix(a.mat, freedofs=V.FreeDofs()).GetPETScMat()
 
-ksp = psc.KSP()
-ksp.create()
+ksp = psc.KSP().create()
 ksp.setOperators(p4p_mat)
 ksp.setType(psc.KSP.Type.CG)
 ksp.setNormType(psc.KSP.NormType.NORM_NATURAL)
@@ -36,14 +33,14 @@ ksp.view()
 if comm.rank==0:
     ksp.setMonitor(lambda a, b, c: print("it", b, "err", c))
 
-psc_rhs, psc_sol = p4p_mat.createVecs()
-
 # can map between NGSolve and PETSc vectors
-vec_map = wrapped_mat.GetRowMap()
+vmap = ngp.VecMap(V.ParallelDofs(), V.FreeDofs())
 
-vec_map.NGs2PETSc(f.vec, psc_rhs)
+psc_rhs = vmap(f.vec)
+psc_sol = vmap.CreatePETScVector()
 ksp.solve(b=psc_rhs, x=psc_sol)
-vec_map.PETSc2NGs(gfu.vec, psc_sol)
+gfu.vec.data = vmap(psc_sol)
+
 
 # to compare sequential and parallel version:
 ip = InnerProduct(f.vec, gfu.vec)

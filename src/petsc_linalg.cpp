@@ -889,7 +889,10 @@ namespace ngs_petsc_interface {
 
 #ifdef PETSc4Py_INTERFACE
     py::class_<NGs2PETScVecMap, shared_ptr<NGs2PETScVecMap>>
-      (m, "NGs2PETScVecMap", "Can convert between NGSolve and PETSc vectors")
+      (m, "VecMap", "Can convert between NGSolve and PETSc vectors")
+      .def(py::init([](shared_ptr<ngs::ParallelDofs> pardofs, shared_ptr<ngs::BitArray> subset) {
+            return make_shared<NGs2PETScVecMap> (pardofs->GetNDofLocal(), pardofs->GetEntrySize(), pardofs, subset); }),
+          py::arg("pardofs"), py::arg("subset")=nullptr)
       .def("NGs2PETSc", [&](shared_ptr<NGs2PETScVecMap> vmap, shared_ptr<ngs::BaseVector> nvec, pbholder<PETScVec> pvec) { vmap->NGs2PETSc(*nvec, pvec.value); } )
       .def("AddNGs2PETSc", [&](shared_ptr<NGs2PETScVecMap> vmap, double scal, shared_ptr<ngs::BaseVector> nvec, pbholder<PETScVec> pvec) { vmap->AddNGs2PETSc(scal, *nvec, pvec.value); } )
       .def("AddNGs2PETSc", [&](shared_ptr<NGs2PETScVecMap> vmap, ngs::Complex scal, shared_ptr<ngs::BaseVector> nvec, pbholder<PETScVec> pvec) { vmap->AddNGs2PETSc(scal, *nvec, pvec.value); } )
@@ -899,6 +902,19 @@ namespace ngs_petsc_interface {
       .def("GetLGMap", [&](shared_ptr<NGs2PETScVecMap> & vmap) { return pbholder<ISLocalToGlobalMapping>(vmap->GetISMap()); })
       .def("CreateNGsVector", [](shared_ptr<NGs2PETScVecMap> & vec) { return vec->CreateNGsVector(); })
       .def("CreatePETScVector", [](shared_ptr<NGs2PETScVecMap> & vec) { return pbholder<PETScVec>(vec->CreatePETScVector()); })
+
+      .def("__call__", [](shared_ptr<NGs2PETScVecMap> vmap, pbholder<PETScVec> pvec)
+           {
+             shared_ptr<ngs::BaseVector> nvec = vmap->CreateNGsVector();
+             vmap->PETSc2NGs(*nvec, pvec.value);
+             return nvec;
+           })
+      .def("__call__", [](shared_ptr<NGs2PETScVecMap> vmap, shared_ptr<ngs::BaseVector> nvec)
+           {
+             pbholder<PETScVec> pvec = vmap->CreatePETScVector();
+             vmap->NGs2PETSc(*nvec, pvec.value);
+             return pvec;
+           })
       ;
 #endif // PETSc4Py_INTERFACE
 
