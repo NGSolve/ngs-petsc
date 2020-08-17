@@ -1,40 +1,33 @@
+from mpi4py import MPI
 from ngsolve import *
 import petsc4py as psc
 import ngs_petsc as ngp
-from netgen.meshing import Mesh as NGMesh
-import sys
+# import sys
 
-comm = mpi_world
+comm = MPI.COMM_WORLD
 
+from netgen.geom2d import unit_square
 if comm.rank==0:
-    from netgen.geom2d import unit_square
-    ngm = unit_square.GenerateMesh(maxh=0.05)
-    if comm.size>1:
-        ngm.Distribute(comm)
+    mesh = Mesh(unit_square.GenerateMesh(maxh=0.05).Distribute(comm))
 else:
-    ngm = NGMesh.Receive(comm)
-mesh = Mesh(ngm)
+    mesh = Mesh(netgen.meshing.Mesh.Receive(comm))
 
+    
 V = H1(mesh, order=1, dirichlet='.*')
 u,v = V.TnT()
-a = BilinearForm(V)
-a += SymbolicBFI(InnerProduct(grad(u),grad(v)))
-f = LinearForm(V)
-f += SymbolicLFI(v)
-f.Assemble()
+a = BilinearForm(grad(u)*grad(v)*dx).Assemble()
+f = LinearForm(1*v*dx).Assemble()
+
 gfu = GridFunction(V)
-# c = Preconditioner(a, 'bddc')
-a.Assemble()
 
-ngp.Initialize()
+# ngp.Initialize()
 
-
-wrapped_mat = ngp.PETScMatrix(a.mat, freedofs=V.FreeDofs(), format=ngp.PETScMatrix.IS_AIJ)
+wrapped_mat = ngp.PETScMatrix(a.mat, freedofs=V.FreeDofs()) #  format=ngp.PETScMatrix.IS_AIJ)
 
 # gives access to the petsc4py mat
 p4p_mat = wrapped_mat.GetPETScMat()
-if comm.size > 1:
-    p4p_mat.convert("mpiaij") 
+# if comm.size > 1:
+#    p4p_mat.convert("mpiaij") 
 
 # this is a wrapper around a KSP
 wrapped_ksp = ngp.KSP(mat=wrapped_mat, name="someksp", petsc_options={"ksp_type":"cg", "pc_type" : "gamg"}, finalize=False)
@@ -42,7 +35,8 @@ wrapped_ksp = ngp.KSP(mat=wrapped_mat, name="someksp", petsc_options={"ksp_type"
 # this is the petsc4py KSP
 ksp = wrapped_ksp.GetKSP()
 ksp.setTolerances(1e-6, 0, 1e12, 20)
-ksp.setMonitor(lambda a, b, c: print("it", b, "err", c))
+if comm.rank==0:
+    ksp.setMonitor(lambda a, b, c: print("it", b, "err", c))
 
 wrapped_ksp.Finalize()
 
