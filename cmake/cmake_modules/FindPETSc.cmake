@@ -93,6 +93,7 @@ find_path (PETSC_DIR include/petsc.h
   # MacPorts path
   /opt/local/lib/petsc
   $ENV{HOME}/petsc
+  /Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/petsc
   DOC "PETSc Directory")
 
 find_program (MAKE_EXECUTABLE NAMES make gmake)
