@@ -20,40 +20,26 @@ f = LinearForm(1*v*dx).Assemble()
 
 gfu = GridFunction(V)
 
-# ngp.Initialize()
-
-wrapped_mat = ngp.PETScMatrix(a.mat, freedofs=V.FreeDofs()) #  format=ngp.PETScMatrix.IS_AIJ)
-
-# gives access to the petsc4py mat
+wrapped_mat = ngp.PETScMatrix(a.mat, freedofs=V.FreeDofs()) 
 p4p_mat = wrapped_mat.GetPETScMat()
-# if comm.size > 1:
-#    p4p_mat.convert("mpiaij") 
-
-# this is a wrapper around a KSP
-# wrapped_ksp = ngp.KSP(mat=wrapped_mat, name="someksp", petsc_options={"ksp_type":"cg", "pc_type" : "gamg"}, finalize=False)
-
-# this is the petsc4py KSP
-# ksp = wrapped_ksp.GetKSP()
 
 ksp = psc.KSP()
 ksp.create()
 ksp.setOperators(p4p_mat)
 ksp.setType(psc.KSP.Type.CG)
 ksp.setNormType(psc.KSP.NormType.NORM_NATURAL)
+ksp.getPC().setType("gamg")
 ksp.setTolerances(rtol=1e-6, atol=0, divtol=1e16, max_it=50)
-# how to set preconditioner ????
-# ksp.setOptionsPrefix( { "pc_type" : "gamg" } )
+
+ksp.view()
 
 if comm.rank==0:
     ksp.setMonitor(lambda a, b, c: print("it", b, "err", c))
 
-# wrapped_ksp.Finalize()
+psc_rhs, psc_sol = p4p_mat.createVecs()
 
 # can map between NGSolve and PETSc vectors
 vec_map = wrapped_mat.GetRowMap()
-psc_rhs = vec_map.CreatePETScVector()
-psc_sol = vec_map.CreatePETScVector()
-
 
 vec_map.NGs2PETSc(f.vec, psc_rhs)
 ksp.solve(b=psc_rhs, x=psc_sol)
@@ -69,5 +55,6 @@ if comm.rank==0:
     print('inner product:', ip)
 
 
+# only available in sequential mode
 Draw(gfu, name='sol')
 
