@@ -202,7 +202,9 @@ namespace ngs_petsc_interface {
 			       results["conv_r"] = py::str(name_reason(conv_r));
 			       PETScInt nits; KSPGetIterationNumber(ksp, &nits);
 			       results["nits"] = py::int_(nits);
-			       PetscReal* pr; PETScInt nr; KSPGetResidualHistory(ksp, &pr, &nr); //gets us nr of used res-entries!
+			       const PetscReal* pr; 
+			       PETScInt nr; 
+			       KSPGetResidualHistory(ksp, &pr, &nr); //gets us nr of used res-entries!
 			       auto py_r_l = py::list(); for (auto k : Range(nr)) py_r_l.append(py::float_(pr[k]));
 			       results["errs"] = py_r_l;
 			       PetscReal res_n; KSPGetResidualNorm(ksp, &res_n);

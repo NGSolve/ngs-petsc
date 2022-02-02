@@ -181,9 +181,8 @@ namespace ngs_petsc_interface
   void PETScCompositePC :: AddPC (shared_ptr<NGs2PETScPrecond> component)
   {
     keep_alive.Append(component); // keep it alive
-
-    PCCompositeAddPC(GetPETScPC(), PCSHELL);
     
+    PCCompositeAddPCType(GetPETScPC(), PCSHELL);
     PetscInt num; PCCompositeGetNumberPC(GetPETScPC(), &num);
     PETScPC cpc; PCCompositeGetPC(GetPETScPC(), num-1, &cpc);
     PCShellSetContext(cpc, (void*)component.get());

@@ -5,7 +5,12 @@ libpetscinterface.__all__ = ["Initialize", "Finalize"]
 
 # linear algebra
 libpetscinterface.__all__ += ["PETScBaseMatrix", "PETScMatrix",
-                              "FlatPETScMatrix", "VecMap"]
+                              "FlatPETScMatrix"]
+try:
+   import petsc4py
+   libpetscinterface.__all__ += ["VecMap"]
+except ImportError:
+   pass
 
 # preconditioners
 libpetscinterface.__all__ += ["PETScPrecond", "PETSc2NGsPrecond", "ConvertNGsPrecond", "NGs2PETScPrecond",
