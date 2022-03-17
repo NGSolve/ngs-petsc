@@ -68,6 +68,6 @@ else (WITH_PETSC4PY)
   message(STATUS "petsc4py support is turned OFF")
   set(PETSC4PY_INCLUDES "")
 endif (WITH_PETSC4PY)
-
+set(CMAKE_INSTALL_RPATH "${PETSC_DIR}:${PETSC_ARCH}/lib")
 add_subdirectory(src)
 add_subdirectory(python)
