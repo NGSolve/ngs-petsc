@@ -7,6 +7,10 @@ option( WITH_PETSC4PY     "Build interface to petsc4py" OFF )
 
 set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH}" "${CMAKE_CURRENT_SOURCE_DIR}/cmake/cmake_modules")
 
+set(CMAKE_INSTALL_RPATH "${PETSC_DIR}/${PETSC_ARCH}/lib")
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+
+
 find_package(NGSolve CONFIG REQUIRED
   HINTS $ENV{NETGENDIR}/.. /opt/netgen/ /Applications/Netgen.app/Contents/Resources/CMake C:/netgen
 )
