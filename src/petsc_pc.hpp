@@ -83,6 +83,11 @@ namespace ngs_petsc_interface
     virtual int VWidth () const override { return GetAMat()->GetNGsMat()->VWidth(); }
 
 
+    virtual const BaseMatrix & GetMatrix() const override
+    {
+      return *this;
+    }
+
     virtual const BaseMatrix & GetAMatrix () const override { return *GetAMat()->GetNGsMat(); }
     virtual void InitLevel (shared_ptr<ngs::BitArray> freedofs = nullptr) override;
     virtual void FinalizeLevel (const ngs::BaseMatrix * mat = nullptr) override;
