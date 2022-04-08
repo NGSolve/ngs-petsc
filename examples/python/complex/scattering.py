@@ -1,16 +1,20 @@
 from ngsolve import *
 from netgen.geom2d import SplineGeometry
 import ngs_petsc_complex as petsc
+import netgen.meshing
 
 geo = SplineGeometry()
 geo.AddRectangle( (-0.1, -0.25), (0.1, 0.25), leftdomain=0, rightdomain=1, bc = "scatterer")
 geo.AddCircle ( (0, 0), r=1, leftdomain=1, rightdomain=2)
 geo.AddCircle ( (0, 0), r=1.4, leftdomain=2, rightdomain=0)
 
-ngmesh = geo.GenerateMesh(maxh=0.04)
-# ngmesh.Save("scattering.vol")
-mesh = Mesh(ngmesh)
-# mesh = Mesh ("scattering.vol")
+comm = mpi_world 
+
+if comm.rank==0:
+    mesh = Mesh(geo.GenerateMesh(maxh=0.04).Distribute(comm))
+else:
+    mesh = Mesh(netgen.meshing.Mesh.Receive(comm))
+
 
 mesh.SetPML(pml.Radial(origin=(0,0), rad=1, alpha=0.1j), definedon=2)
 
@@ -53,7 +57,3 @@ uscat.vec.data += ksp * res
 Draw (uin, mesh, "uin")
 Draw (uscat, mesh, "uscat")
 Draw (uin-uscat, mesh, "utot")
-
-
-
-

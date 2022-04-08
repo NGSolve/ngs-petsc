@@ -88,6 +88,12 @@ namespace ngs_petsc_interface
 	{ /* KSPDestroy(&ksp); */ }
     }
 
+  void PETScKSP :: UpdateMatrix()
+  {
+    petsc_mat->UpdateValues();
+    // Set System-Mat, and mat to build the PC from
+    KSPSetOperators(GetKSP(), petsc_mat->GetPETScMat(), petsc_mat->GetPETScMat());
+  }
 
   void PETScKSP :: SetPC (shared_ptr<PETScBasePrecond> apc)
   {
@@ -106,6 +112,10 @@ namespace ngs_petsc_interface
     petsc_sol = GetMatrix()->GetColMap()->CreatePETScVector();
   }
 
+  void PETScKSP :: SetInitialSolution(const ngs::BaseVector & sol)
+  {
+    GetMatrix()->GetColMap()->NGs2PETSc(const_cast<ngs::BaseVector&>(sol), petsc_sol);
+  }
 
   void PETScKSP :: Mult (const ngs::BaseVector & x, ngs::BaseVector & y) const
   {
@@ -194,6 +204,8 @@ namespace ngs_petsc_interface {
 	  aksp->SetPC(apc);
 	})
       .def("Finalize", [](shared_ptr<PETScKSP> & aksp) { aksp->Finalize(); })
+      .def("UpdateMatrix", [](shared_ptr<PETScKSP> & aksp) { aksp->UpdateMatrix(); })
+      .def("SetInitialSolution", [](shared_ptr<PETScKSP> & aksp, shared_ptr<ngs::BaseVector> sol) { aksp->SetInitialSolution(*sol); })
       .def_property_readonly("results",
 			     [] (PETScKSP & aksp) -> py::dict {
 			       KSP ksp = aksp.GetKSP();

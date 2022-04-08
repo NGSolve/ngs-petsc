@@ -21,6 +21,8 @@ namespace ngs_petsc_interface
     ~PETScKSP ();
 
     void SetPC (shared_ptr<PETScBasePrecond> apc);
+    void UpdateMatrix ();
+    void SetInitialSolution(const ngs::BaseVector & sol);
 
     void Finalize ();
 

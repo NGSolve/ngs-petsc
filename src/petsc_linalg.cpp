@@ -966,6 +966,7 @@ IS_BAIJ .. sub-assembled diagonal blocks, blocks in sparse block matrix format (
 	     }), py::arg("ngs_mat"), py::arg("freedofs") = nullptr, py::arg("row_freedofs") = nullptr, py::arg("col_freedofs") = nullptr,
 	    py::arg("format") = py::none());
 
+    pcm.def("UpdateValues", [](shared_ptr<PETScMatrix> & mat) { return mat->UpdateValues(); });
     pcm.def("dump", [](shared_ptr<PETScMatrix> mat, string fn) {
 	cout << "dump mat to >>" << fn << "<<" << endl;
 	auto pds = mat->GetRowMap()->GetParallelDofs();
