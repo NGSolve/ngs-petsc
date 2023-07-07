@@ -16,16 +16,16 @@ namespace ngs_petsc_interface
   void SetPETScMatSeq (PETScMat petsc_mat, shared_ptr<ngs::SparseMatrixTM<TM>> spmat,
 		       shared_ptr<ngs::BitArray> rss, shared_ptr<ngs::BitArray> css)
   {
-    static ngs::Timer t(string("SetPETScMatSeq<Mat<") + to_string(ngs::mat_traits<TM>::HEIGHT) + string(">>")); ngs::RegionTimer rt(t);
+    static ngs::Timer t(string("SetPETScMatSeq<Mat<") + to_string(ngs::Height<TM>()) + string(">>")); ngs::RegionTimer rt(t);
 
     PETScInt bs; MatGetBlockSize(petsc_mat, &bs);
-    if (bs != ngs::mat_traits<TM>::WIDTH) {
+    if (bs != ngs::Width<TM>()) {
       throw Exception(string("Block-Size of petsc-mat (") + to_string(bs) + string(") != block-size of ngs-mat(")
-		      + to_string(ngs::mat_traits<TM>::WIDTH) + string(")"));
+		      + to_string(ngs::Width<TM>()) + string(")"));
     }
 	
     // row map (map for a row)
-    PETScInt bw = ngs::mat_traits<TM>::WIDTH;
+    PETScInt bw = ngs::Width<TM>();
     int nbrow = 0;
     Array<int> row_compress(spmat->Width());
     for (auto k : Range(spmat->Width()))
@@ -33,7 +33,7 @@ namespace ngs_petsc_interface
     int ncols = nbrow * bw;
     
     // col map (map for a col)
-    PETScInt bh = ngs::mat_traits<TM>::HEIGHT;
+    PETScInt bh = ngs::Height<TM>();
     int nbcol = 0;
     Array<int> col_compress(spmat->Height());
     for (auto k : Range(spmat->Height()))
@@ -83,9 +83,9 @@ namespace ngs_petsc_interface
        but petsc_mat is in MATMPIAIJ or MATMPIBAIJ format, which is simply distributed row-wise
      **/
 
-    static ngs::Timer t(string("SetPETScMatPar<Mat<") + to_string(ngs::mat_traits<TM>::HEIGHT) + string(">>")); ngs::RegionTimer rt(t);
+    static ngs::Timer t(string("SetPETScMatPar<Mat<") + to_string(ngs::Height<TM>()) + string(">>")); ngs::RegionTimer rt(t);
 
-    PETScInt bs = ngs::mat_traits<TM>::WIDTH;
+    PETScInt bs = ngs::Width<TM>();
 
     auto row_dm = row_map->GetDOFMap();
     auto col_dm = col_map->GetDOFMap();
@@ -128,10 +128,10 @@ namespace ngs_petsc_interface
   template<class TM>
   PETScMat CreatePETScMatSeqBAIJFromSymmetric (shared_ptr<ngs::SparseMatrixSymmetric<TM>> spmat, shared_ptr<ngs::BitArray> rss, shared_ptr<ngs::BitArray> css)
   {
-    static ngs::Timer t(string("CreatePETScMatSeqBAIJFromSymmetric<Mat<") + to_string(ngs::mat_traits<TM>::HEIGHT) + string(">>")); ngs::RegionTimer rt(t);
+    static ngs::Timer t(string("CreatePETScMatSeqBAIJFromSymmetric<Mat<") + to_string(ngs::Height<TM>()) + string(">>")); ngs::RegionTimer rt(t);
 
     // row map (map for a row)
-    PETScInt bw = ngs::mat_traits<TM>::WIDTH;
+    PETScInt bw = ngs::Width<TM>();
     int nbrow = 0;
     Array<int> row_compress(spmat->Width());
     for (auto k : Range(spmat->Width()))
@@ -139,7 +139,7 @@ namespace ngs_petsc_interface
     int ncols = nbrow * bw;
 
     // col map (map for a col)
-    PETScInt bh = ngs::mat_traits<TM>::HEIGHT;
+    PETScInt bh = ngs::Height<TM>();
     int nbcol = 0;
     Array<int> col_compress(spmat->Height());
     for (auto k : Range(spmat->Height()))
@@ -218,15 +218,15 @@ namespace ngs_petsc_interface
   PETScMat CreatePETScMatSeqBAIJ (shared_ptr<ngs::SparseMatrixTM<TM>> spmat, shared_ptr<ngs::BitArray> rss, shared_ptr<ngs::BitArray> css)
   {
 
-    static_assert(ngs::mat_traits<TM>::WIDTH == ngs::mat_traits<TM>::HEIGHT, "PETSc can only handle square block entries!");
+    static_assert(ngs::Width<TM>() == ngs::Height<TM>(), "PETSc can only handle square block entries!");
 
-    static ngs::Timer t(string("CreatePETScMatSeqBAIJ<Mat<") + to_string(ngs::mat_traits<TM>::HEIGHT) + string(">>")); ngs::RegionTimer rt(t);
+    static ngs::Timer t(string("CreatePETScMatSeqBAIJ<Mat<") + to_string(ngs::Height<TM>()) + string(">>")); ngs::RegionTimer rt(t);
 
     if (auto sym_spm = dynamic_pointer_cast<ngs::SparseMatrixSymmetric<TM>>(spmat))
       { return CreatePETScMatSeqBAIJFromSymmetric (sym_spm, rss, css); }
 
     // row map (map for a row)
-    PETScInt bw = ngs::mat_traits<TM>::WIDTH;
+    PETScInt bw = ngs::Width<TM>();
     int nbrow = 0;
     Array<int> row_compress(spmat->Width());
     for (auto k : Range(spmat->Width()))
@@ -234,7 +234,7 @@ namespace ngs_petsc_interface
     int ncols = nbrow * bw;
 
     // col map (map for a col)
-    PETScInt bh = ngs::mat_traits<TM>::HEIGHT;
+    PETScInt bh = ngs::Height<TM>();
     int nbcol = 0;
     Array<int> col_compress(spmat->Height());
     for (auto k : Range(spmat->Height()))
@@ -330,16 +330,16 @@ namespace ngs_petsc_interface
 			      shared_ptr<ngs::BitArray> rss, shared_ptr<ngs::BitArray> css)
   {
 
-    static ngs::Timer t(string("DeleteDuplicateValuesTM<Mat<") + to_string(ngs::mat_traits<TM>::HEIGHT) + string(">>")); ngs::RegionTimer rt(t);
+    static ngs::Timer t(string("DeleteDuplicateValuesTM<Mat<") + to_string(ngs::Height<TM>()) + string(">>")); ngs::RegionTimer rt(t);
 
     PETScInt bs; MatGetBlockSize(petsc_mat, &bs);
-    if (bs != ngs::mat_traits<TM>::WIDTH) {
+    if (bs != ngs::Width<TM>()) {
       throw Exception(string("Block-Size of petsc-mat (") + to_string(bs) + string(") != block-size of ngs-mat(")
-		      + to_string(ngs::mat_traits<TM>::WIDTH) + string(")"));
+		      + to_string(ngs::Width<TM>()) + string(")"));
     }
 	
     // row map (map for a row)
-    PETScInt bw = ngs::mat_traits<TM>::WIDTH;
+    PETScInt bw = ngs::Width<TM>();
     int nbrow = 0;
     Array<int> row_compress(spmat->Width());
     for (auto k : Range(spmat->Width()))
@@ -347,7 +347,7 @@ namespace ngs_petsc_interface
     int ncols = nbrow * bw;
     
     // col map (map for a col)
-    PETScInt bh = ngs::mat_traits<TM>::HEIGHT;
+    PETScInt bh = ngs::Height<TM>();
     int nbcol = 0;
     Array<int> col_compress(spmat->Height());
     for (auto k : Range(spmat->Height()))
